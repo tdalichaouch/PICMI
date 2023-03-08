@@ -29,19 +29,18 @@ zmax = 2.5/k_pe
 
 
 # --- drive bunch 
-bunch_rms_size_dr            = [0.331/k_pe, 0.331/k_pe, 0.48/k_pe]
-bunch_physical_particles_dr  = 16 * plasma_density * np.prod(bunch_rms_size_dr) * (2 * np.pi)**1.5
-bunch_rms_velocity_dr        = [0.,0.,0.*cst.c]
+bunch_rms_size_dr            = [0.331/k_pe, 0.331/k_pe, 0.48/k_pe] # 5.56 um, 5.56 um, 8.07 um
+bunch_physical_particles_dr  = int(16 * plasma_density * np.prod(bunch_rms_size_dr) * (2 * np.pi)**1.5) # Q = 1 nc
+bunch_rms_velocity_dr        = [10.*cst.c,10.*cst.c,0.0]
 bunch_centroid_position_dr   = [0.,0., 0.0]
 bunch_centroid_velocity_dr   = [0.,0.,20000.*cst.c]
 
 # --- trailing bunch 
-bunch_rms_size_tr            = [0.1026/k_pe, 0.1026/k_pe, 0.24/k_pe]
-bunch_physical_particles_tr  = 100 * plasma_density * np.prod(bunch_rms_size_tr) * (2 * np.pi)**1.5
-bunch_rms_velocity_tr        = [0.,0.,0.*cst.c]
+bunch_rms_size_tr            = [0.1026/k_pe, 0.1026/k_pe, 0.24/k_pe] # 1.72 um, 1.72 um, 4.03 um
+bunch_physical_particles_tr  = int(100 * plasma_density * np.prod(bunch_rms_size_tr) * (2 * np.pi)**1.5) # Q = 0.3 nC
+bunch_rms_velocity_tr        = [10.*cst.c,10.*cst.c,0.0]
 bunch_centroid_position_tr   = [0.,0.,-5.55/k_pe]
 bunch_centroid_velocity_tr   = [0.,0.,20000.*cst.c]
-
 
 moving_window_velocity = [0., 0., cst.c]
 
