@@ -1,0 +1,220 @@
+{
+    "simulation": {
+        "nodes": [
+            4,
+            1
+        ],
+        "grid": [
+            256,
+            512
+        ],
+        "max_mode": 1,
+        "box": {
+            "r": [
+                0.0,
+                7.5
+            ],
+            "z": [
+                -2.5,
+                7.5
+            ]
+        },
+        "field_boundary": "open",
+        "time": 100.0,
+        "dt": 10.0,
+        "interpolation": "linear",
+        "n0": 9.999999999999998e+16,
+        "nbeams": 2,
+        "nspecies": 1,
+        "nneutrals": 0,
+        "nlasers": 0,
+        "iter_max": 1,
+        "iter_reltol": 0.001,
+        "iter_abstol": 0.001,
+        "dump_restart": false,
+        "read_restart": false,
+        "verbose": 1,
+        "if_timing": false,
+        "random_seed": 10,
+        "algorithm": "standard"
+    },
+    "beam": [
+        {
+            "npmax": 1000000,
+            "ppc": [
+                2,
+                2,
+                2
+            ],
+            "num_theta": 8,
+            "evolution": true,
+            "quiet_start": true,
+            "geometry": "cartesian",
+            "profile": [
+                "gaussian",
+                "gaussian",
+                "gaussian"
+            ],
+            "q": -1.0,
+            "m": 1.0,
+            "density": 15.999999999139497,
+            "gamma": 20000.0,
+            "gauss_center": [
+                0.0,
+                0.0,
+                -0.0
+            ],
+            "gauss_sigma": [
+                0.331,
+                0.331,
+                0.48
+            ],
+            "uth": [
+                10.0,
+                10.0,
+                0.0
+            ],
+            "range1": [
+                -1.655,
+                1.655
+            ],
+            "range2": [
+                -1.655,
+                1.655
+            ],
+            "range3": [
+                -2.4,
+                2.4
+            ],
+            "diag": [
+                {
+                    "name": [
+                        "charge_cyl_m"
+                    ],
+                    "ndump": 1
+                },
+                {
+                    "name": [
+                        "raw"
+                    ],
+                    "ndump": 1,
+                    "psample": 20
+                }
+            ]
+        },
+        {
+            "npmax": 1000000,
+            "ppc": [
+                2,
+                2,
+                2
+            ],
+            "num_theta": 8,
+            "evolution": true,
+            "quiet_start": true,
+            "geometry": "cartesian",
+            "profile": [
+                "gaussian",
+                "gaussian",
+                "gaussian"
+            ],
+            "q": -1.0,
+            "m": 1.0,
+            "density": 99.99999995006343,
+            "gamma": 20000.0,
+            "gauss_center": [
+                0.0,
+                0.0,
+                5.55
+            ],
+            "gauss_sigma": [
+                0.1026,
+                0.1026,
+                0.24
+            ],
+            "uth": [
+                10.0,
+                10.0,
+                0.0
+            ],
+            "range1": [
+                -0.513,
+                0.513
+            ],
+            "range2": [
+                -0.513,
+                0.513
+            ],
+            "range3": [
+                4.35,
+                6.75
+            ],
+            "diag": [
+                {
+                    "name": [
+                        "charge_cyl_m"
+                    ],
+                    "ndump": 1
+                },
+                {
+                    "name": [
+                        "raw"
+                    ],
+                    "ndump": 1,
+                    "psample": 20
+                }
+            ]
+        }
+    ],
+    "species": [
+        {
+            "npmax": 1000000,
+            "ppc": [
+                2,
+                2
+            ],
+            "num_theta": 8,
+            "push_type": "standard",
+            "profile": [
+                "uniform",
+                "piecewise-linear"
+            ],
+            "q": -1.0,
+            "m": 1.0,
+            "density": 1.0,
+            "piecewise_s": [
+                4.9999,
+                5.0,
+                105.0,
+                105.0001
+            ],
+            "piecewise_fs": [
+                0.0,
+                1.0,
+                1.0,
+                0.0
+            ],
+            "diag": [
+                {
+                    "name": [
+                        "charge_cyl_m"
+                    ],
+                    "ndump": 1
+                }
+            ]
+        }
+    ],
+    "field": {
+        "diag": [
+            {
+                "name": [
+                    "er_cyl_m",
+                    "ephi_cyl_m",
+                    "ez_cyl_m",
+                    "psi_cyl_m"
+                ],
+                "ndump": 1
+            }
+        ]
+    }
+}
