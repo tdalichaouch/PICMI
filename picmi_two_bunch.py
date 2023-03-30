@@ -2,8 +2,8 @@
 
 
 # import picmi_qpic
-import picmi_qpad as picmi
-# from quickpic import picmi
+import picmi_qpic as picmi
+# import picmi_qpad as picmi
 import numpy as np
 
 cst = picmi.constants
@@ -43,15 +43,29 @@ bunch_centroid_velocity_tr   = [0.,0.,20000.*cst.c]
 
 moving_window_velocity = [0., 0., cst.c]
 
-## QuickPIC needs a quasistatic solver...
 
 em_solver_method = 'Yee'
 geometry = '3D'
 n_macroparticle_per_cell = [2, 2, 2]
+codename = picmi.codename
+	
+
+plasma_dist_dict, beam_dist_dict, sim_dict, field_diag_dict, part_diag_dict = {},{}, {}, {}, {}
+# dictionaries to pass in
+if(codename == 'QPAD' or codename =='QuickPIC'):	
+	plasma_dist_dict[codename + '_r_max'] = 20.e-6
+	plasma_dist_dict[codename + '_r_max'] = 0.0
+	part_diag_dict[codename + '_sample'] = 20
+	sim_dict[codename + '_n0'] = plasma_density
 
 if picmi.codename == 'QPAD':
 	geometry = 'Quasi-3D'
-
+	beam_dist_dict['n_macroparticle_per_cell'] = n_macroparticle_per_cell
+	sim_dict[codename + '_nodes'] = [4, 1]
+else:
+	field_diag_dict[codename + '_slice'] = ['yz',257]
+	beam_dist_dict['n_macroparticles'] = 128**3
+	sim_dict[codename + '_nodes'] = [128, 1]
 
 
 
@@ -105,27 +119,30 @@ plasma_dist = picmi.UniformDistribution(
 			density = plasma_density,
 			lower_bound = plasma_min,
 			upper_bound = plasma_max,
-			QPAD_r_max = 20.e-6,
-			QPAD_r_min = 0.0 )
+			**plasma_dist_dict )
 
 plasma = picmi.Species(particle_type = 'electron', 
 						name = 'plasma',
 						initial_distribution = plasma_dist)
 
-
-beam_layout = picmi.GriddedLayout(
-					grid = grid,
-					n_macroparticle_per_cell = n_macroparticle_per_cell)
-
+if(picmi.codename == 'QuickPIC'):
+	beam_layout = picmi.PseudoRandomLayout(
+						grid = grid,
+						**beam_dist_dict)
+else:
+	beam_layout = picmi.GriddedLayout(
+						grid = grid,
+						**beam_dist_dict)
 
 ### Particle diagnostics for each species
 field_diag = picmi.FieldDiagnostic(data_list = ['E','rho','psi'],
                                    grid = grid,
-                                   period = 1)
+                                   period = 1,
+                                   **field_diag_dict)
 
 part_diag = picmi.ParticleDiagnostic(period = 1,
                                      species = [drive_beam, trailing_beam],
-                                     QPAD_sample = 20)
+                                     **part_diag_dict)
 
 plasma_layout = picmi.GriddedLayout(
 					grid = grid,
@@ -136,8 +153,8 @@ plasma_layout = picmi.GriddedLayout(
 ## modify time-step for OSIRIS/WarpX codes
 dt = 10.0/w_pe
 tmax = 100.0/w_pe
-sim = picmi.Simulation(solver = solver, verbose = 1, QPAD_n0 = plasma_density,\
-	QPAD_nodes = [4, 1], time_step_size = dt, max_time =tmax)
+sim = picmi.Simulation(solver = solver, verbose = 1,\
+	 time_step_size = dt, max_time =tmax, **sim_dict)
 
 
 sim.add_species(species = drive_beam, layout = beam_layout)
@@ -151,5 +168,5 @@ max_steps = int(tmax/dt)
 if run_python_simulation:
 	sim.step(max_steps)
 else:
-	sim.write_input_file('qpinput_qpad.json')
+	sim.write_input_file('qpinput_' + codename + '.json')
 

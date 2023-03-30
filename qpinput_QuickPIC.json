@@ -1,7 +1,7 @@
 {
     "simulation": {
         "nodes": [
-            128,
+            4,
             1
         ],
         "indx": 9,
