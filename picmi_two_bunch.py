@@ -5,13 +5,13 @@
 import picmi_qpic as picmi
 # import picmi_qpad as picmi
 import numpy as np
-
+# from scipy import constants as cst
 cst = picmi.constants
 
 
 
 plasma_density = 1.e17 * 1e6
-w_pe = np.sqrt(cst.q_e**2 * plasma_density/(cst.ep_0 * cst.m_e))
+w_pe = np.sqrt(cst.q_e**2 * plasma_density/(cst.ep0 * cst.m_e))
 k_pe = w_pe/cst.c
 plasma_min     = [None,  None, 5.0/k_pe]
 plasma_max     = [None,  None,  105.0/k_pe]
@@ -58,14 +58,15 @@ if(codename == 'QPAD' or codename =='QuickPIC'):
 	part_diag_dict[codename + '_sample'] = 20
 	sim_dict[codename + '_n0'] = plasma_density
 
+cpu_split = []
 if picmi.codename == 'QPAD':
 	geometry = 'Quasi-3D'
 	beam_dist_dict['n_macroparticle_per_cell'] = n_macroparticle_per_cell
-	sim_dict[codename + '_nodes'] = [4, 1]
+	cpu_split = [4,1]
 else:
 	field_diag_dict[codename + '_slice'] = ['yz',257]
 	beam_dist_dict['n_macroparticles'] = 128**3
-	sim_dict[codename + '_nodes'] = [128, 1]
+	cpu_split = [128,1]
 
 
 
@@ -154,7 +155,7 @@ plasma_layout = picmi.GriddedLayout(
 dt = 10.0/w_pe
 tmax = 100.0/w_pe
 sim = picmi.Simulation(solver = solver, verbose = 1,\
-	 time_step_size = dt, max_time =tmax, **sim_dict)
+	 time_step_size = dt, max_time =tmax,cpu_split = cpu_split, **sim_dict)
 
 
 sim.add_species(species = drive_beam, layout = beam_layout)

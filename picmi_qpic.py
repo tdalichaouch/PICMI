@@ -17,7 +17,8 @@ picmistandard.register_codename(codename)
 
 class constants:
 	c = 299792458.
-	ep_0 = 8.8541878128e-12
+	ep0 = 8.8541878128e-12
+	mu0 = 4 * np.pi * 1e-7
 	q_e = 1.602176634e-19
 	m_e = 9.1093837015e-31
 	m_p = 1.67262192369e-27
@@ -83,6 +84,9 @@ class Species(picmistandard.PICMI_Species):
 			keyvals['quiet_start'] = self.quiet_start
 		self.initial_distribution.fill_dict(keyvals)
 
+	def activate_field_ionization(self,model,product_species):
+		raise Exception('Ionization not yet supported in QuickPIC Open-source')
+
 
 		
 
@@ -112,14 +116,14 @@ class GaussianBunchDistribution(picmistandard.PICMI_GaussianBunchDistribution):
 		# get charge, peak density in unnormalized units
 		part_charge = species.charge
 		total_charge = part_charge * self.n_physical_particles
-		if(species.density_scale is not None):
+		if(species.density_scale):
 			total_charge *= species.density_scale
 		
 		peak_density = total_charge/(part_charge * np.prod(self.rms_bunch_size) * (2 * np.pi)**1.5)
 
 
 		# normalize quantities to plasma density and skin depths
-		w_pe = np.sqrt(constants.q_e**2 * density_norm/(constants.ep_0 * constants.m_e) ) 
+		w_pe = np.sqrt(constants.q_e**2 * density_norm/(constants.ep0 * constants.m_e) ) 
 		k_pe = w_pe/constants.c
 
 
@@ -217,7 +221,7 @@ class UniformDistribution(picmistandard.PICMI_UniformDistribution):
 		self.m = species.mass/constants.m_e
 
 		# normalize quantities to plasma density and skin depths
-		w_pe = np.sqrt(constants.q_e**2 * density_norm/(constants.ep_0 * constants.m_e) ) 
+		w_pe = np.sqrt(constants.q_e**2 * density_norm/(constants.ep0 * constants.m_e) ) 
 		k_pe = w_pe/constants.c
 
 		#normalize coordinates 
@@ -246,63 +250,30 @@ class UniformDistribution(picmistandard.PICMI_UniformDistribution):
 
 
 class AnalyticDistribution(picmistandard.PICMI_AnalyticDistribution):
-	"""
-	QuickPIC-Specific Parameters
-	
-	### Plasma-specific parameters ####
-
-	self.profile: integer
-		Specifies profile-type of uniform plasma.
-		profile = 0 (uniform plasma or piecewise linear function in z), 12 (piecewise linear along r and z)
-		Profiles are multiplicative f(r,z) = f(r)  * f(z)
-
-	self.s, self.r: array
-		Specifies longitudinal coordinates of piecewise profile in z=s and r.
-
-	self.fs, self.fz: array
-		Species normalized densities along coordinates specified by self.fs and self.fz.
-
-	QuickPIC_r_min, QuickPIC_r_max: float, optional
-		Radial range (i.e. QuickPIC_r_min <= r <= QuickPIC_r_max) for particles in UniformDistribution. Only required when specifying transverse lower_bounds or upper_bounds.
- 
-	### TO BE IMPLEMENTED
-	"""
-
 	def init(self,kw):
-		# default profile for uniform plasmas
-		self.profile = 0
+		raise Exception('Analytic distribution functions not yet supported in open-source QuickPIC')
 
-		self.s, self.r, self.fs, self.fr = None, None, None, None
-
-		# Handle optional args
-		self.r_min = kw.pop('QuickPIC_r_min', None)
-		self.r_max = kw.pop('QuickPIC_r_max', None)
-
-		raise Exception('AnalyticDistribution has not yet been implemented')
+class ParticleListDistribution(picmistandard.PICMI_ParticleListDistribution):
+	def init(self,kw):
+		raise Exception('Particle list distributions not yet supported in open-source QuickPIC')
 
 
-	def normalize_units(self,species, density_norm):
-		# normalize plasma density
-		self.norm_density = self.density/density_norm
+# constant, analytic, or mirror fields not yet supported in QuickPIC 
+class ConstantAppliedField(picmistandard.PICMI_ConstantAppliedField):
+	def init(self,kw):
+		raise Exception("Constant applied fields are not yet supported in QuickPIC Open-source")
 
-		# normalized charge, mass, density
-		self.q = species.charge/constants.q_e
-		self.m = species.mass/constants.m_e
+class AnalyticAppliedField(picmistandard.PICMI_AnalyticAppliedField):
+	def init(self,kw):
+		raise Exception("Analytic applied fields are not yet supported in QuickPIC Open-source")
 
-		# normalize quantities to plasma density and skin depths
-		w_pe = np.sqrt(constants.q_e**2 * density_norm/(constants.ep_0 * constants.m_e) ) 
-		k_pe = w_pe/constants.c
+class Mirror(picmistandard.PICMI_Mirror):
+	def init(self,kw):
+		raise Exception("Mirrors are not yet supported in QuickPIC Open-source")
 
-		#normalize coordinates 
-		if(self.z is not None):
-			for i in range(len(self.z)):
-				self.z[i] *= k_pe 
-		if(self.r is not None):
-			for i in range(len(self.r)):
-				self.r[i] *= k_pe
 
-		if(np.any(self.rms_velocity != 0.0) or np.any(self.directed_velocity != 0.0)):
-			print('Warning: QuickPIC does not support rms velocity or directed velocity for Uniform Distributions. These parameters will be ignored.')
+
+
 
 class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
 	"""
@@ -319,20 +290,9 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
 	def fill_dict(self,keyvals):
 		keyvals['iter'] = self.maximum_iterations
 		
-class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
+class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
 	def init(self, kw):
-		self.maximum_iterations = kw.pop('QuickPIC_maximum_iterations', None)
-		if(self.maximum_iterations == None):
-			print('Defaulting to n_iterations = 1 for predictor corrector')
-			self.maximum_iterations = 1
-	def fill_dict(self,keyvals):
-		keyvals['iter'] = self.maximum_iterations
-		
-		
-
-
-
-
+		raise Exception('This feature is not supported. Please use the Electromagnetic solver.')
 
 class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
 	def init(self, kw):
@@ -361,7 +321,7 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
 
 	def normalize_units(self, density_norm):
 		# normalize quantities to plasma density and skin depths
-		w_pe = np.sqrt(constants.q_e**2 * density_norm/(constants.ep_0 * constants.m_e) ) 
+		w_pe = np.sqrt(constants.q_e**2 * density_norm/(constants.ep0 * constants.m_e) ) 
 		k_pe = w_pe/constants.c
 
 		#normalize coordinates 
@@ -385,18 +345,18 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
 		
 		
 
-## Throw Errors if trying to use 2D cartesian and cylindrical grids with QuickPIC
-class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
+## QuickPIC is a 3D code. Throw Errors if trying to use 1D, 2D cartesian and cylindrical grids with QuickPIC
+class Cartesian1DGrid(picmistandard.PICMI_Cartesian1DGrid):
 	def init(self, kw):
-		raise Exception('Quickpic does not support this feature. Please specify a 3D Cartesian Grid.')
+		raise Exception('Quickpic does not support 1D Cartesian grids. Please specify a 3D Cartesian Grid.')
 
 class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
 	def init(self, kw):
-		raise Exception('Quickpic does not support this feature. Please specify a 3D Cartesian Grid.')
+		raise Exception('Quickpic does not support 2D cartesian grids. Please specify a 3D Cartesian Grid.')
 
 class CylindricalGrid(picmistandard.PICMI_CylindricalGrid):
 	def init(self, kw):
-		raise Exception('Quickpic does not support this feature. Please specify a 3D Cartesian Grid.')
+		raise Exception('Quickpic does not support cylindrical grids. Please specify a 3D Cartesian Grid.')
 
 class PseudoRandomLayout(picmistandard.PICMI_PseudoRandomLayout):
 	"""
@@ -451,9 +411,6 @@ class Simulation(picmistandard.PICMI_Simulation):
 	QuickPIC_n0: float, optional
 		Plasma density [m^3] to normalize units.
 
-	QuickPIC_nodes: int(2), optional
-		MPI-node configuration
-
 	QuickPIC_read_restart: boolean, optional
 		Toggle to read from restart files.
 	
@@ -472,7 +429,11 @@ class Simulation(picmistandard.PICMI_Simulation):
 			print('Warning: Defaulting to linear particle shapes.')
 			self.particle_shape = 'linear'
 
-		self.nodes = kw.pop('QuickPIC_nodes', [1, 1])
+		if(not self.cpu_split):
+			# default to 1 cpu if mpi config unspecified
+			self.cpu_split = [1, 1]
+		else:
+			assert len(self.cpu_split) == 2, Exception('QuickPIC requires 2D cpu_split')
 
 
 		### QuickPIC differentiates between beams and plasmas (species)
@@ -499,7 +460,7 @@ class Simulation(picmistandard.PICMI_Simulation):
 
 
 	def normalize_simulation(self):
-		w_pe = np.sqrt(constants.q_e**2.0 * self.n0/(constants.ep_0 * constants.m_e) ) 
+		w_pe = np.sqrt(constants.q_e**2.0 * self.n0/(constants.ep0 * constants.m_e) ) 
 		self.max_time *= w_pe
 		self.time_step_size *= w_pe
 		self.solver.grid.normalize_units(self.n0)
@@ -512,12 +473,15 @@ class Simulation(picmistandard.PICMI_Simulation):
 
 		# handle checks for beams
 		self.if_beam.append(species.profile_type == 'beam')
+
+	def add_laser(self,laser, injection_method):
+		raise Exception('Laser modules are not available in open-source QuickPIC')
 			
 
 
 	def fill_dict(self, keyvals):
 		# fill grid and mpi params
-		keyvals['nodes'] = self.nodes
+		keyvals['nodes'] = self.cpu_split
 		self.solver.grid.fill_dict(keyvals)
 
 		# fill simulation time and dt
@@ -606,8 +570,6 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic):
 		Specifies plane and index of third coordinate to dump (e.g., ["yz", 256])
 	"""
 	def init(self,kw):
-		assert self.write_dir != '.', Exception("Write directory feature not yet supported.")
-		assert self.period > 0, Exception("Diagnostic period is not valid")
 		self.field_list = []
 		self.source_list = []
 		if('E' in self.data_list):
@@ -618,6 +580,12 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic):
 			self.source_list += ['charge']
 		if('J' in self.data_list):
 			self.source_list += ['jx','jy','jz']
+		if(self.write_dir):
+			print('Warning: FieldDiagnostic write_dir set to "."') 
+		if(self.step_min):
+			print('Warning: FieldDiagnostic step_min set to 0')
+		if(self.step_max):
+			print('Warning: FieldDiagnostic step_max set to no limit')
 
 
 		# TODO: add to PICMI standard
@@ -638,7 +606,22 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic):
 		if(self.slice):
 			keyvals['slice'] = [self.slice]
 
-## to be implemented	
+
+# QuickPIC does not support electrostatic and boosted frame diagnostic 
+class ElectrostaticFieldDiagnostic(picmistandard.PICMI_ElectrostaticFieldDiagnostic):
+	def init(self,kw):
+		raise Exception("Electrostatic field diagnostic not supported in QuickPIC")
+
+class LabFrameParticleDiagnostic(picmistandard.PICMI_LabFrameParticleDiagnostic):
+	def init(self,kw):
+		raise Exception("Boosted frame diagnostics not support in QuickPIC")
+
+class LabFrameFieldDiagnostic(picmistandard.PICMI_LabFrameFieldDiagnostic):
+	def init(self,kw):
+		raise Exception("Boosted frame diagnostics not support in QuickPIC")
+
+
+	
 class ParticleDiagnostic(picmistandard.PICMI_ParticleDiagnostic):
 	"""
 	QuickPIC-Specific Parameters
@@ -647,10 +630,14 @@ class ParticleDiagnostic(picmistandard.PICMI_ParticleDiagnostic):
 		Dumps every nth particle.
 	"""
 	def init(self,kw):
-		assert self.write_dir != '.', Exception("Write directory feature not yet supported.")
-		assert self.period > 0, Exception("Diagnostic period is not valid")
 		print('Warning: Particle diagnostic reporting momentum, position and charge data')
-		self.sample = kw.pop('QuickPIC_sample', None) 
+		self.sample = kw.pop('QuickPIC_sample', None)
+		if(self.write_dir and self.write_dir != '.'):
+			print('Warning: ParticleDiagnostic write_dir set to "."') 
+		if(self.step_min):
+			print('Warning: ParticleDiagnostic step_min set to 0')
+		if(self.step_max):
+			print('Warning: ParticleDiagnostic step_max set to no limit')
 
 	def fill_dict_fld(self,keyvals):
 		pass
