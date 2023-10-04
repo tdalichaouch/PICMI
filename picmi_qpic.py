@@ -3,10 +3,12 @@
 
 import picmistandard
 import numpy as np
+import re
 import math
 import json 
 from json import encoder
 from itertools import cycle
+import periodictable
 
 
 encoder.FLOAT_REPR = lambda o: format(o, '.4f')
@@ -50,14 +52,39 @@ class Species(picmistandard.PICMI_Species):
 	"""
 	# initialization 
 	def init(self, kw):
+		print('type',self.particle_type)
+		print('name',self.name)
 		part_types = {'electron': [-constants.q_e, constants.m_e] ,\
 		'positron': [constants.q_e, constants.m_e],\
 		'proton': [constants.q_e, constants.m_p],\
 		'anti-proton' : [-constants.q_e, constants.m_p]}
 
 		if(self.particle_type in part_types):
-			if(self.charge is None): self.charge = part_types[self.particle_type][0]
-			if(self.mass is None): self.mass = part_types[self.particle_type][1]
+			if(self.charge is None): 
+				self.charge = part_types[self.particle_type][0]
+			if(self.mass is None): 
+				self.mass = part_types[self.particle_type][1]
+		else:
+			self.charge = self.charge_state * constants.q_e
+			m = re.match(r'(?P<iso>#[\d+])*(?P<sym>[A-Za-z]+)', self.particle_type)
+			element = periodictable.elements.symbol(m['sym'])
+			if(m['iso'] is not None):
+				element = element[m['iso'][1:]]
+			if(self.charge_state is not None):
+				assert self.charge_state <= element.number, Exception('%s charge state not valid'%self.particle_type)
+				try:
+					element = element.ion[self.charge_state]
+				except ValueError:
+					# Note that not all valid charge states are defined in elements,
+					# so this value error can be ignored.
+					pass
+			self.element = element
+			if self.mass is None:
+				self.mass = element.mass*periodictable.constants.atomic_mass_constant
+
+
+
+
 
 
 		# Handle optional args for beams 
@@ -71,24 +98,40 @@ class Species(picmistandard.PICMI_Species):
 			self.profile_type = 'beam'
 		elif(isinstance(self.initial_distribution, UniformDistribution)):
 			self.profile_type = 'species'
+		elif(isinstance(self.initial_distribution, AnalyticDistribution)):
+			self.profile_type = 'species'
 		else:
 			print('Warning: Only Uniform and Gaussian distributions are currently supported.')
 
 
 	def normalize_units(self):
-		self.initial_distribution.normalize_units()
+		# normalized charge, mass, density
+		self.q = self.charge/constants.q_e
+		self.m = self.mass/constants.m_e
 
 	def fill_dict(self, keyvals):
 		if(self.profile_type == 'beam'):
 			keyvals['evolution'] = self.beam_evolution
 			keyvals['quiet_start'] = self.quiet_start
+		keyvals['q'] = self.q
+		keyvals['m'] = self.m
+		if(not isinstance(self.initial_distribution, GaussianBunchDistribution)):
+			if(self.density_scale is not None):
+				keyvals['density'] = self.initial_distribution.norm_density *self.density_scale
+			else:
+				keyvals['density'] = self.initial_distribution.norm_density
 		self.initial_distribution.fill_dict(keyvals)
 
 	def activate_field_ionization(self,model,product_species):
 		raise Exception('Ionization not yet supported in QuickPIC Open-source')
 
 
-		
+picmistandard.PICMI_MultiSpecies.Species_class = Species
+class MultiSpecies(picmistandard.PICMI_MultiSpecies):
+	def init(self, kw):
+		return
+		# for species in self.species_instances_list:
+		# 	print(species.name)
 
 
 class GaussianBunchDistribution(picmistandard.PICMI_GaussianBunchDistribution):
@@ -138,15 +181,10 @@ class GaussianBunchDistribution(picmistandard.PICMI_GaussianBunchDistribution):
 
 		self.gamma = self.centroid_velocity[2]
 
-		# normalized charge, mass, density
-		self.q = species.charge/constants.q_e
-		self.m = species.mass/constants.m_e
 		self.norm_density = peak_density/density_norm
 
 	def fill_dict(self,keyvals):
 		keyvals['profile'] = self.profile
-		keyvals['q'] = self.q
-		keyvals['m'] = self.m
 		keyvals['peak_density'] = self.norm_density
 		keyvals['gamma'] = self.gamma
 		keyvals['center'] = self.centroid_position
@@ -216,9 +254,9 @@ class UniformDistribution(picmistandard.PICMI_UniformDistribution):
 		# normalize plasma density
 		self.norm_density = self.density/density_norm
 
-		# normalized charge, mass, density
-		self.q = species.charge/constants.q_e
-		self.m = species.mass/constants.m_e
+		# # normalized charge, mass, density
+		# self.q = species.charge/constants.q_e
+		# self.m = species.mass/constants.m_e
 
 		# normalize quantities to plasma density and skin depths
 		w_pe = np.sqrt(constants.q_e**2 * density_norm/(constants.ep0 * constants.m_e) ) 
@@ -237,9 +275,6 @@ class UniformDistribution(picmistandard.PICMI_UniformDistribution):
 
 	def fill_dict(self,keyvals):
 		keyvals['profile'] = self.profile
-		keyvals['q'] = self.q
-		keyvals['m'] = self.m
-		keyvals['density'] = self.norm_density
 		keyvals['longitudinal_profile'] = self.longitudinal_profile
 		if(self.longitudinal_profile == 'piecewise_linear'):
 			keyvals['piecewise_s'] = self.z
@@ -250,8 +285,41 @@ class UniformDistribution(picmistandard.PICMI_UniformDistribution):
 
 
 class AnalyticDistribution(picmistandard.PICMI_AnalyticDistribution):
+	"""
+	QuickPIC-Specific Parameters
+	
+	### Plasma-specific parameters ####
+
+	self.profile: integer
+		Specifies profile-type of uniform plasma.
+		profile = 13 (analytic functions x, y, z)
+		Profiles are multiplicative f(r,z) = f(r)  * f(z)
+
+	"""
 	def init(self,kw):
-		raise Exception('Analytic distribution functions not yet supported in open-source QuickPIC')
+		# default profile for uniform plasmas
+		self.profile = 13
+		self.math_func = self.density_expression
+		if(np.any(self.momentum_expressions == None)):
+			print('Warning: QuickPIC does not support momentum expressions for Analytic Distributions.')
+
+
+	def normalize_units(self,species, density_norm):
+
+		# normalize quantities to plasma density and skin depths
+		w_pe = np.sqrt(constants.q_e**2 * density_norm/(constants.ep0 * constants.m_e) ) 
+		k_pe = w_pe/constants.c
+		self.math_func = '{}'.format(self.math_func).replace('x', '(' + str(1.0/k_pe) +'* x)')
+		self.math_func = '{}'.format(self.math_func).replace('y', '(' + str(1.0/k_pe) +'* y)')
+		self.math_func = '{}'.format(self.math_func).replace('z', '(' + str(1.0/k_pe) +'* z)')
+		self.math_func =  self.math_func + '/' + str(density_norm) 
+		self.norm_density = 1.0
+		if(np.any(self.rms_velocity != 0.0) or np.any(self.directed_velocity != 0.0)):
+			print('Warning: QuickPIC does not support rms velocity or directed velocity for Analytic Distributions.')
+
+	def fill_dict(self,keyvals):
+		keyvals['profile'] = self.profile
+		keyvals['math_func'] = self.math_func
 
 class ParticleListDistribution(picmistandard.PICMI_ParticleListDistribution):
 	def init(self,kw):
@@ -380,7 +448,7 @@ class PseudoRandomLayout(picmistandard.PICMI_PseudoRandomLayout):
 			print('Warning: Casting n_macroparticles = ' + str(self.n_macroparticles) + ' to np_per_dimension = [' + \
 				str(np_per_dim) + ',' +str(np_per_dim) + ',' + str(np_per_dim) + ']' )
 
-		self.npmax = kw.pop('QuickPIC_npmax', 10**6)
+		self.npmax = kw.pop('QuickPIC_npmax', int(2 * np.prod(self.np)))
 	def fill_dict(self, keyvals):
 		keyvals['np'] = self.np
 		keyvals['npmax'] = self.npmax
@@ -466,13 +534,25 @@ class Simulation(picmistandard.PICMI_Simulation):
 		self.solver.grid.normalize_units(self.n0)
 	
 	def add_species(self, species, layout, initialize_self_field = None):
-		picmistandard.PICMI_Simulation.add_species( self, species, layout,
-									  initialize_self_field )
-		if(self.n0 is not None):
-			species.initial_distribution.normalize_units(species, self.n0)
+		if(isinstance(species, MultiSpecies)):
+			for spec in species.species_instances_list:
+				picmistandard.PICMI_Simulation.add_species( self, spec, layout,
+										  initialize_self_field )
 
-		# handle checks for beams
-		self.if_beam.append(species.profile_type == 'beam')
+				# handle checks for beams
+				self.if_beam.append(spec.profile_type == 'beam')
+				spec.normalize_units()
+			if(self.n0 is not None):
+					species.initial_distribution.normalize_units(spec, self.n0)
+
+		else:
+			picmistandard.PICMI_Simulation.add_species( self, species, layout,
+										  initialize_self_field )
+			if(self.n0 is not None):
+				species.initial_distribution.normalize_units(species, self.n0)
+				species.normalize_units()
+			# handle checks for beams
+			self.if_beam.append(species.profile_type == 'beam')
 
 	def add_laser(self,laser, injection_method):
 		raise Exception('Laser modules are not available in open-source QuickPIC')

@@ -1,0 +1,247 @@
+{
+    "simulation": {
+        "nodes": [
+            1,
+            1
+        ],
+        "grid": [
+            32,
+            480
+        ],
+        "max_mode": 2,
+        "box": {
+            "r": [
+                0.0,
+                3.65861514621509
+            ],
+            "z": [
+                -1.2195383820716967,
+                4.634245851872447
+            ]
+        },
+        "field_boundary": "open",
+        "time": 20.0,
+        "dt": 1.0,
+        "interpolation": "linear",
+        "n0": 4.2e+17,
+        "nbeams": 1,
+        "nspecies": 3,
+        "nneutrals": 0,
+        "nlasers": 1,
+        "iter_max": 1,
+        "iter_reltol": 0.001,
+        "iter_abstol": 0.001,
+        "dump_restart": false,
+        "read_restart": false,
+        "verbose": 1,
+        "if_timing": false,
+        "random_seed": 10,
+        "algorithm": "standard"
+    },
+    "beam": [
+        {
+            "npmax": 200000,
+            "total_num": 100000,
+            "profile_type": "random",
+            "evolution": true,
+            "quiet_start": true,
+            "geometry": "cartesian",
+            "q": -1.0,
+            "m": 1.0,
+            "density": 15.117532365295473,
+            "profile": [
+                "gaussian",
+                "gaussian",
+                "gaussian"
+            ],
+            "gamma": 1000.0,
+            "gauss_center": [
+                0.0,
+                0.0,
+                2.6829844405577323
+            ],
+            "total_charge": -0.4318541817718194,
+            "gauss_sigma": [
+                0.12195383820716965,
+                0.12195383820716965,
+                0.12195383820716965
+            ],
+            "uth": [
+                0.0,
+                0.0,
+                10.0
+            ],
+            "range1": [
+                -0.6097691910358483,
+                0.6097691910358483
+            ],
+            "range2": [
+                -0.6097691910358483,
+                0.6097691910358483
+            ],
+            "range3": [
+                2.0732152495218843,
+                3.2927536315935804
+            ],
+            "diag": [
+                {
+                    "name": [
+                        "charge_cyl_m",
+                        "jr_cyl_m",
+                        "jphi_cyl_m",
+                        "jz_cyl_m"
+                    ],
+                    "ndump": 1
+                },
+                {
+                    "name": [
+                        "raw"
+                    ],
+                    "ndump": 1,
+                    "psample": 1
+                }
+            ]
+        }
+    ],
+    "species": [
+        {
+            "npmax": 2000000,
+            "ppc": [
+                2,
+                4
+            ],
+            "num_theta": 4,
+            "push_type": "standard_pgc",
+            "q": -1.0,
+            "m": 1.0,
+            "density": 4.2,
+            "profile": [
+                "analytic",
+                "analytic"
+            ],
+            "uth": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "math_func": "1.e23*(1+tanh(((8.199823922730873e-06* z)-20.e-6)/10.e-6))/2./4.2e+23",
+            "diag": [
+                {
+                    "name": [
+                        "charge_cyl_m",
+                        "jr_cyl_m",
+                        "jphi_cyl_m",
+                        "jz_cyl_m"
+                    ],
+                    "ndump": 1
+                }
+            ]
+        },
+        {
+            "npmax": 2000000,
+            "ppc": [
+                2,
+                4
+            ],
+            "num_theta": 4,
+            "push_type": "standard_pgc",
+            "q": 1.0,
+            "m": 7295.295853865013,
+            "density": 0.2,
+            "profile": [
+                "analytic",
+                "analytic"
+            ],
+            "uth": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "math_func": "1.e23*(1+tanh(((8.199823922730873e-06* z)-20.e-6)/10.e-6))/2./4.2e+23",
+            "diag": [
+                {
+                    "name": [
+                        "charge_cyl_m",
+                        "jr_cyl_m",
+                        "jphi_cyl_m",
+                        "jz_cyl_m"
+                    ],
+                    "ndump": 1
+                }
+            ]
+        },
+        {
+            "npmax": 2000000,
+            "ppc": [
+                2,
+                4
+            ],
+            "num_theta": 4,
+            "push_type": "standard_pgc",
+            "q": 5.0,
+            "m": 72820.73676665184,
+            "density": 0.8,
+            "profile": [
+                "analytic",
+                "analytic"
+            ],
+            "uth": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "math_func": "1.e23*(1+tanh(((8.199823922730873e-06* z)-20.e-6)/10.e-6))/2./4.2e+23",
+            "diag": [
+                {
+                    "name": [
+                        "charge_cyl_m",
+                        "jr_cyl_m",
+                        "jphi_cyl_m",
+                        "jz_cyl_m"
+                    ],
+                    "ndump": 1
+                }
+            ]
+        }
+    ],
+    "laser": [
+        {
+            "profile": [
+                "gaussian",
+                "polynomial"
+            ],
+            "a0": 4.0,
+            "k0": 64.40126649095288,
+            "w0": 0.6097691910358484,
+            "iteration": 3,
+            "focal_distance": 12.195383820716966,
+            "t_rise": 0.8377002675488363,
+            "t_fall": 0.8377002675488363,
+            "t_flat": 0,
+            "lon_center": -0.0007593163046757732,
+            "diag": [
+                {
+                    "name": [
+                        "a_cyl_m"
+                    ],
+                    "ndump": 1
+                }
+            ]
+        }
+    ],
+    "field": {
+        "diag": [
+            {
+                "name": [
+                    "er_cyl_m",
+                    "ephi_cyl_m",
+                    "ez_cyl_m",
+                    "br_cyl_m",
+                    "bphi_cyl_m",
+                    "bz_cyl_m"
+                ],
+                "ndump": 1
+            }
+        ]
+    }
+}

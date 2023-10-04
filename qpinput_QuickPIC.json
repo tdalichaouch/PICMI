@@ -39,12 +39,12 @@
                 128,
                 128
             ],
-            "npmax": 1000000,
+            "npmax": 4194304,
             "evolution": true,
             "quiet_start": true,
-            "profile": 0,
             "q": -1.0,
             "m": 1.0,
+            "profile": 0,
             "peak_density": 15.999999999139497,
             "gamma": 20000.0,
             "center": [
@@ -100,12 +100,12 @@
                 128,
                 128
             ],
-            "npmax": 1000000,
+            "npmax": 4194304,
             "evolution": true,
             "quiet_start": true,
-            "profile": 0,
             "q": -1.0,
             "m": 1.0,
+            "profile": 0,
             "peak_density": 99.99999995006343,
             "gamma": 20000.0,
             "center": [
@@ -163,10 +163,10 @@
                 2,
                 2
             ],
-            "profile": 0,
             "q": -1.0,
             "m": 1.0,
             "density": 1.0,
+            "profile": 0,
             "longitudinal_profile": "piecewise_linear",
             "piecewise_s": [
                 4.9999,
