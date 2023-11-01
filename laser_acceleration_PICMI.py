@@ -5,7 +5,7 @@
 #from fbpic import picmi
 # from pywarpx import picmi
 # import picmi_osiris as picmi
-import picmi_qpic as picmi
+import picmi_osiris as picmi
 import numpy as np
 
 # Create alias fror constants
@@ -57,7 +57,7 @@ max_steps = 1000
 # --- grid
 nx = 64
 ny = 64
-nz = 512
+nz = 480
 xmin = 1.5*plasma_min[0]
 xmax = 1.5*plasma_max[0]
 ymin = 1.5*plasma_min[1]
