@@ -9,7 +9,7 @@ import json
 from json import encoder
 from itertools import cycle
 import periodictable
-
+from decimal import Decimal
 
 encoder.FLOAT_REPR = lambda o: format(o, '.4f')
 
@@ -92,10 +92,10 @@ class Species(picmistandard.PICMI_Species):
 			self.geometry = 'cartesian'
 		elif(isinstance(self.initial_distribution, UniformDistribution)):
 			self.profile_type = 'species'
-			self.push_type = 'standard'
+			self.push_type = 'robust'
 		elif(isinstance(self.initial_distribution, AnalyticDistribution)):
 			self.profile_type = 'species'
-			self.push_type = 'standard'
+			self.push_type = 'robust'
 		else:
 			print('Warning: Only Uniform and Gaussian distributions are currently supported.')
 
@@ -120,10 +120,11 @@ class Species(picmistandard.PICMI_Species):
 		keyvals['q'] = self.q
 		keyvals['m'] = self.m
 
+		q_scale = np.abs(self.charge/constants.q_e)
 		if(self.density_scale is not None):
-			keyvals['density'] = self.initial_distribution.norm_density *self.density_scale
+			keyvals['density'] = self.initial_distribution.norm_density *self.density_scale * q_scale
 		else:
-			keyvals['density'] = self.initial_distribution.norm_density
+			keyvals['density'] = self.initial_distribution.norm_density * q_scale
 		self.initial_distribution.fill_dict(keyvals)
 
 	def activate_field_ionization(self,model,product_species):
@@ -232,24 +233,8 @@ class UniformDistribution(picmistandard.PICMI_UniformDistribution):
 	"""
 	def init(self,kw):
 		# default profile for uniform plasmas
-		self.profile = ['uniform', 'uniform']
-		self.s, self.r, self.fs, self.fr = None, None, None, None
-		self.z, self.r = None, None
-
-		# Handle optional args
-		self.r_min = kw.pop(codename + '_r_min', None)
-		self.r_max = kw.pop(codename + '_r_max', None)
-		# if range-bound along z
-		if(self.upper_bound[2] is not None and self.lower_bound[2] is not None):
-			self.profile[1] = 'piecewise-linear'
-			z_low, z_high, z_len = self.lower_bound[2], self.upper_bound[2], np.abs(self.upper_bound[2] - self.lower_bound[2])
-			self.z = [z_low - z_len* 1.e-6, z_low, z_high, z_high + z_len * 1.e-6 ]
-			self.fz = [0., 1., 1., 0.]
-
-		# check if range bound in transverse direction
-		transverse_flag = any(ele is not None for ele in self.lower_bound[:2]) or any(ele is not None for ele in self.upper_bound[:2])
-		if(transverse_flag):
-			print('Warning: ' + codename + ' does not support range bound along r.')
+		self.profile = ['analytic', 'analytic']
+		
 
 
 	def normalize_units(self,species, density_norm):
@@ -264,31 +249,32 @@ class UniformDistribution(picmistandard.PICMI_UniformDistribution):
 		w_pe = np.sqrt(constants.q_e**2 * density_norm/(constants.ep0 * constants.m_e) ) 
 		k_pe = w_pe/constants.c
 
-		#normalize coordinates 
-		if(self.z is not None):
-			for i in range(len(self.z)):
-				self.z[i] *= k_pe 
-		if(self.r is not None):
-			for i in range(len(self.r)):
-				self.r[i] *= k_pe
+		self.density_expression =  str(self.norm_density)
+		self.norm_density = 1.0
+
+		for i in range(3):
+			if(self.lower_bound[i] is not None):
+				self.lower_bound[i] *= k_pe
+			if(self.upper_bound[i] is not None):
+				self.upper_bound[i] *= k_pe
+
+		for i in range(3):
+			self.rms_velocity[i] /= constants.c 
 
 		if(np.any(self.directed_velocity != 0.0)):
-			print('Warning: ' + codename + ' does not support directed velocity for Uniform Distributions.')
+			print('Warning: ' + codename + ' does not support directed velocity for Analytic Distributions.')
 
 	def fill_dict(self,keyvals):
+		back_str,front_str = construct_bounds(self.lower_bound,self.upper_bound)
 		keyvals['profile'] = self.profile
-		keyvals['q'] = self.q
-		keyvals['m'] = self.m
 		keyvals['uth'] = self.rms_velocity
-		if(self.profile[1] == 'piecewise-linear'):
-			keyvals['piecewise_s'] = self.z
-			keyvals['piecewise_fs'] = self.fz
+		keyvals['math_func'] = front_str + self.density_expression + back_str
 
 
 
 class AnalyticDistribution(picmistandard.PICMI_AnalyticDistribution):
 	"""
-	QuickPIC-Specific Parameters
+	QPAD-Specific Parameters
 	
 	### Plasma-specific parameters ####
 
@@ -301,9 +287,8 @@ class AnalyticDistribution(picmistandard.PICMI_AnalyticDistribution):
 	def init(self,kw):
 		# default profile for uniform plasmas
 		self.profile = ['analytic', 'analytic']
-		self.math_func = self.density_expression
 		if(np.any(self.momentum_expressions == None)):
-			print('Warning: QuickPIC does not support momentum expressions for Analytic Distributions.')
+			print('Warning: QPAD does not support momentum expressions for Analytic Distributions.')
 
 
 	def normalize_units(self,species, density_norm):
@@ -311,10 +296,15 @@ class AnalyticDistribution(picmistandard.PICMI_AnalyticDistribution):
 		# normalize quantities to plasma density and skin depths
 		w_pe = np.sqrt(constants.q_e**2 * density_norm/(constants.ep0 * constants.m_e) ) 
 		k_pe = w_pe/constants.c
-		self.math_func = '{}'.format(self.math_func).replace('x', '(' + str(1.0/k_pe) +'* x)')
-		self.math_func = '{}'.format(self.math_func).replace('y', '(' + str(1.0/k_pe) +'* y)')
-		self.math_func = '{}'.format(self.math_func).replace('z', '(' + str(1.0/k_pe) +'* z)')
-		self.math_func =  self.math_func + '/' + str(density_norm) 
+
+		for i in range(3):
+			if(self.lower_bound[i] is not None):
+				self.lower_bound[i] *= k_pe
+			if(self.upper_bound[i] is not None):
+				self.upper_bound[i] *= k_pe
+
+		self.density_expression = normalize_math_func(self.density_expression, density_norm)
+		self.density_expression =  self.density_expression + '/' + str(density_norm)
 		self.norm_density = 1.0
 
 		for i in range(3):
@@ -325,9 +315,10 @@ class AnalyticDistribution(picmistandard.PICMI_AnalyticDistribution):
 
 
 	def fill_dict(self,keyvals):
+		back_str,front_str = construct_bounds(self.lower_bound,self.upper_bound)
 		keyvals['profile'] = self.profile
 		keyvals['uth'] = self.rms_velocity
-		keyvals['math_func'] = self.math_func
+		keyvals['math_func'] = front_str + self.density_expression + back_str
 
 
 class ParticleListDistribution(picmistandard.PICMI_ParticleListDistribution):
@@ -335,7 +326,7 @@ class ParticleListDistribution(picmistandard.PICMI_ParticleListDistribution):
 		raise Exception('Particle list distributions not yet supported in QPAD')
 
 
-# constant, analytic, or mirror fields not yet supported in QuickPIC 
+# constant, analytic, or mirror fields not yet supported in QPAD
 class ConstantAppliedField(picmistandard.PICMI_ConstantAppliedField):
 	def init(self,kw):
 		raise Exception("Constant applied fields are not yet supported in QPAD")
@@ -359,8 +350,8 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
 	def init(self, kw):
 		self.maximum_iterations = kw.pop(codename + '_maximum_iterations', None)
 		if(self.maximum_iterations == None):
-			print('Defaulting to n_iterations = 1 for predictor corrector')
-			self.maximum_iterations = 1
+			print('Defaulting to n_iterations = 2 for predictor corrector')
+			self.maximum_iterations = 2
 	def fill_dict(self,keyvals):
 		keyvals['iter_max'] = self.maximum_iterations
 		keyvals['iter_reltol'] = 1e-3
@@ -403,11 +394,8 @@ class CylindricalGrid(picmistandard.PICMI_CylindricalGrid):
 		assert self.moving_window_velocity == [0, 0, constants.c]
 
 		# check for open boundaries at r_max
-		assert self.upper_boundary_conditions[0] == 'open', Exception('QPAD supports open boundaries in r-direction.')
-		
-		# check for open boundaries along z	
-		assert self.lower_boundary_conditions[1] == 'open' and self.upper_boundary_conditions[1] =='open', \
-		Exception('QPAD supports open boundaries in z-direction.')
+		if(self.upper_boundary_conditions[0] != 'open' or self.lower_boundary_conditions[1] != 'open' or self.upper_boundary_conditions[1] !='open'): 
+			print('QPAD Defaulting to open boundaries in r and z-directions.')
 
 
 		self.boundary = 'open'
@@ -537,23 +525,19 @@ class Simulation(picmistandard.PICMI_Simulation):
 		if(self.verbose is None):
 			self.verbose = 0
 		assert self.time_step_size is not None, Exception('QPAD requires a time step size for the 3D loop.')
-		if(self.max_time is None):
-			self.max_time = self.max_steps * self.time_step_size
+
 		if(self.particle_shape not in  ['linear']):
 			print('Warning: Defaulting to linear particle shapes.')
 			self.particle_shape = 'linear'
 
-		self.nodes = kw.pop(codename + '_nodes', [1, 1])
-
+		if(self.cpu_split is None):
+			self.cpu_split = [1,1]
 
 		### QPAD differentiates between beams and plasmas (species)
 		self.if_beam = []
 
 		# check if normalized density is specified
 		self.n0 = kw.pop(codename + '_n0', None)
-
-		# set interpolation order
-		self.interpolation = kw.pop(codename + '_interpolation', 'linear')
 
 		# set number of seeds for pseudo-random numbers
 		self.random_seed = kw.pop(codename + '_random_seed', 10)
@@ -583,7 +567,8 @@ class Simulation(picmistandard.PICMI_Simulation):
 
 	def normalize_simulation(self):
 		w_pe = np.sqrt(constants.q_e**2.0 * self.n0/(constants.ep0 * constants.m_e) ) 
-		self.max_time *= w_pe
+		if(self.max_time is not None):
+			self.max_time *= w_pe
 		self.time_step_size *= w_pe
 		self.solver.grid.normalize_units(self.n0)
 	
@@ -620,14 +605,17 @@ class Simulation(picmistandard.PICMI_Simulation):
 
 
 	def fill_dict(self, keyvals):
+		if(self.max_time is None):
+			self.max_time = self.max_steps * self.time_step_size
+
 		# fill grid and mpi params
-		keyvals['nodes'] = self.nodes
+		keyvals['nodes'] = self.cpu_split
 		self.solver.grid.fill_dict(keyvals)
 
 		# fill simulation time and dt
 		keyvals['time'] = self.max_time
 		keyvals['dt'] = self.time_step_size
-		keyvals['interpolation'] = self.interpolation
+		keyvals['interpolation'] = self.particle_shape
 
 
 		if(self.n0 is not None):
@@ -738,6 +726,27 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic):
 			self.source_list += ['jr_cyl_m','jphi_cyl_m','jz_cyl_m']
 
 
+		if('Ex' in self.data_list):
+			self.field_list.append('er_cyl_m')
+		if('Ey' in self.data_list):
+			self.field_list.append('ephi_cyl_m')
+		if('Ez' in self.data_list):
+			self.field_list.append('ez_cyl_m')
+
+		if('Bx' in self.data_list):
+			self.field_list.append('br_cyl_m')
+		if('By' in self.data_list):
+			self.field_list.append('bphi_cyl_m')
+		if('Bz' in self.data_list):
+			self.field_list.append('bz_cyl_m')
+
+		if('Jx' in self.data_list):
+			self.source_list.append('jr_cyl_m')
+		if('Jy' in self.data_list):
+			self.source_list.append('jphi_cyl_m')
+		if('Jz' in self.data_list):
+			self.source_list.append('jz_cyl_m')
+
 		# need to add to PICMI standard
 		if('psi' in self.data_list):
 			self.field_list += ['psi_cyl_m']
@@ -752,7 +761,7 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic):
 		keyvals['ndump'] = self.period
 
 
-# QuickPIC does not support electrostatic and boosted frame diagnostic 
+# QPAD does not support electrostatic and boosted frame diagnostic 
 class ElectrostaticFieldDiagnostic(picmistandard.PICMI_ElectrostaticFieldDiagnostic):
 	def init(self,kw):
 		raise Exception("Electrostatic field diagnostic not supported in QPAD")
@@ -824,11 +833,12 @@ class GaussianLaser(picmistandard.PICMI_GaussianLaser):
 		tt = []
 		for diag in diagnostics:
 			temp_dict = {}
-			if(diag.data_list is not None  and 'E' in diag.data_list):
-				temp_dict['name'] = ['a_cyl_m']
-				temp_dict['ndump'] = diag.period
-				tt.append(temp_dict)
-				break
+			if(diag.data_list is not None):
+				if('E' in diag.data_list or 'Ex' in diag.data_list or 'Ey' in diag.data_list or 'Ez' in diag.data_list):
+					temp_dict['name'] = ['a_cyl_m']
+					temp_dict['ndump'] = diag.period
+					tt.append(temp_dict)
+					break
 
 		keyvals['diag'] = tt
 
@@ -840,3 +850,53 @@ class LaserAntenna(picmistandard.PICMI_LaserAntenna):
 class BinomialSmoother(picmistandard.PICMI_BinomialSmoother):
 	def init(self, kw):
 		print("Warning: QPAD has no BinomialSmoother. Skipping feature.")
+
+def normalize_math_func(math_func, density_norm):
+	w_pe = np.sqrt(constants.q_e**2 * density_norm/(constants.ep0 * constants.m_e) ) 
+	k_pe = w_pe/constants.c
+
+	## handle overlap with funcs and variable names
+	funcs = ['exp','max', 'tan', 'sqrt','not','int','rect','step']
+	funcs2 = ['e1p','ma1', '1an', 'sqr1', 'no1', 'in1', 'rec1', 's1ep']
+	math_func2 = math_func[:]
+	for i in range(len(funcs)):
+		key1, key2 = funcs[i], funcs2[i]
+		math_func2 = '{}'.format(math_func2).replace(key1,key2)
+
+
+	math_func2 = '{}'.format(math_func2).replace('x', '(' + format_decimal(1.0/k_pe) +'* x)')
+	math_func2 = '{}'.format(math_func2).replace('y', '(' + format_decimal(1.0/k_pe) +'* y)')
+	math_func2 = '{}'.format(math_func2).replace('z', '(' + format_decimal(1.0/k_pe) +'* z)')
+	math_func2 = '{}'.format(math_func2).replace('t', '(' + format_decimal(1.0/w_pe) +'* t)')
+	for i in range(len(funcs)):
+		key1, key2 = funcs2[i], funcs[i]
+		math_func2 = '{}'.format(math_func2).replace(key1,key2)
+	
+	## handle overlap with funcs and variable names
+	return math_func2
+
+def format_decimal(decimal):
+	str_out= '%.6e' % Decimal(str(decimal))
+	return str_out
+
+def construct_bounds(lower_bound,upper_bound):
+	front_str =''
+	back_str = ''
+	coords = ['x','y','z']
+	for i in range(3):
+		if(upper_bound[i] is not None):
+			if(len(front_str) > 0):
+				front_str = front_str + ' && ' + coords[i] + '<= (' + format_decimal(upper_bound[i]) + ') ' 
+			else:
+				front_str = front_str + coords[i] + '<= (' + format_decimal(upper_bound[i]) + ') ' 
+
+		if(lower_bound[i] is not None):
+			if(len(front_str) > 0):
+				front_str = front_str + ' && ' + coords[i] + '>= (' + format_decimal(lower_bound[i]) + ') ' 
+			else:
+				front_str = front_str + coords[i] + '>= (' + format_decimal(lower_bound[i]) + ') ' 
+			
+
+	front_str = 'if(' + front_str + ','
+	back_str = ', 0 )'
+	return back_str,front_str

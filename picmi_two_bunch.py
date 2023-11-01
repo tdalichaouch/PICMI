@@ -53,8 +53,6 @@ codename = picmi.codename
 plasma_dist_dict, beam_dist_dict, sim_dict, field_diag_dict, part_diag_dict = {},{}, {}, {}, {}
 # dictionaries to pass in
 if(codename == 'QPAD' or codename =='QuickPIC'):	
-	plasma_dist_dict[codename + '_r_max'] = 20.e-6
-	plasma_dist_dict[codename + '_r_max'] = 0.0
 	part_diag_dict[codename + '_sample'] = 20
 	sim_dict[codename + '_n0'] = plasma_density
 
