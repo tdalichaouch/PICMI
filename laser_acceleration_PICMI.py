@@ -88,7 +88,7 @@ if picmi.codename == 'OSIRIS' or picmi.codename == 'QuickPIC':
     # number of particle per cell in the r, theta, z direction respectively
 
 if(geometry == '3D'):
-    cpu_split = [8,8,2]
+    cpu_split = [2,2,4]
 else:
     cpu_split = [4,2]
 # Physics part - can be in separate file
@@ -98,15 +98,15 @@ else:
 # ------------------
 
 # --- laser
-# laser = picmi.GaussianLaser(
-#     wavelength             = laser_wavelength,
-#     waist                  = laser_waist,
-#     duration               = laser_duration,
-#     focal_position         = [0., 0., laser_focal_distance + laser_injection_loc],
-#     centroid_position      = [0., 0., laser_injection_loc - cst.c*laser_t_peak],
-#     polarization_direction = [math.cos(laser_polarization), math.sin(laser_polarization), 0.],
-#     propagation_direction  = [0,0,1],
-#     a0                     = laser_a0)
+laser = picmi.GaussianLaser(
+    wavelength             = laser_wavelength,
+    waist                  = laser_waist,
+    duration               = laser_duration,
+    focal_position         = [0., 0., laser_focal_distance + laser_injection_loc],
+    centroid_position      = [0., 0., laser_injection_loc - cst.c*laser_t_peak],
+    polarization_direction = [math.cos(laser_polarization), math.sin(laser_polarization), 0.],
+    propagation_direction  = [0,0,1],
+    a0                     = laser_a0)
 
 # --- plasma
 plasma_dist = picmi.AnalyticDistribution(
@@ -213,10 +213,10 @@ sim = picmi.Simulation(solver = solver, verbose = 1,cpu_split = cpu_split,
                     time_step_size = dt,  **sim_dict)
 
 # Inject the laser through an antenna
-# antenna = picmi.LaserAntenna(
-#                 position = (0, 0, 9.e-6),
-#                 normal_vector = (0, 0, 1.))
-# sim.add_laser(laser, injection_method = antenna)
+antenna = picmi.LaserAntenna(
+                position = (0, 0, 9.e-6),
+                normal_vector = (0, 0, 1.))
+sim.add_laser(laser, injection_method = antenna)
 
 # Add the plasma: continuously injected by the moving window
 plasma_layout = picmi.GriddedLayout(

@@ -5,7 +5,7 @@ simulation
  
 node_conf
 { 
-	node_number = 2,8,8,
+	node_number = 4,2,2,
 	if_periodic = .false.,.true.,.true.,
 } 
  
@@ -209,6 +209,25 @@ diag_species
 	ndump_fac = 200,
 	ndump_fac_raw = 200,
 	raw_fraction = 1,
+} 
+ 
+zpulse_mov_wall
+{ 
+	tenv_type = 'polynomial',
+	propagation = 'forward',
+	wall_vel = -0.99,
+	a0 = 4.0,
+	omega0 = 64.40126649095288,
+	per_w0 = 0.6097691910358484,0.6097691910358484,
+	per_type = 'gaussian',
+	per_center = 0.0,0.0,
+	pol = 90.0,
+	per_focus = 13.292968364581494,
+	tenv_rise = 0.8377002675488363,
+	tenv_fall = 0.8377002675488363,
+	wall_pos = 0.838459583853512,
+	xi0 = 0.838459583853512,
+	ncells = 11,
 } 
  
 current

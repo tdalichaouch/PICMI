@@ -468,7 +468,7 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
 				emf_bound_dict['type(:,' + str(i+1) + ')'] = [self.grid.lower_boundary_conditions[i], self.grid.upper_boundary_conditions[i]]
 		el_mag_fld_solver_dict = {}
 		if(self.method == 'fei'):
-			el_mag_fld_solver_dict['type'] = 'dual'
+			el_mag_fld_solver_dict['type'] = 'xu'
 			el_mag_fld_solver_dict['solver_ord'] = 2
 			el_mag_fld_solver_dict['n_coef'] = 8
 			el_mag_fld_solver_dict['weight_w'] = 0.3
