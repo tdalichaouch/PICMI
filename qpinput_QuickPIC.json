@@ -163,23 +163,12 @@
                 2,
                 2
             ],
+            "push_type": "robust",
             "q": -1.0,
             "m": 1.0,
             "density": 1.0,
-            "profile": 0,
-            "longitudinal_profile": "piecewise_linear",
-            "piecewise_s": [
-                4.9999,
-                5.0,
-                105.0,
-                105.0001
-            ],
-            "piecewise_density": [
-                0.0,
-                1.0,
-                1.0,
-                0.0
-            ],
+            "profile": 13,
+            "math_func": "if(z<= (1.050000e+02)  && z>= (5.000000e+00) ,1.0, 0 )",
             "diag": [
                 {
                     "name": [

@@ -213,5 +213,5 @@ max_steps = int(tmax/dt)
 if run_python_simulation:
 	sim.step(max_steps)
 else:
-	sim.write_input_file('qpinput2_' + codename + '.json')
+	sim.write_input_file('qpinput232_' + codename + '.json')
 

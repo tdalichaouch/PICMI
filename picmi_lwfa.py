@@ -3,7 +3,8 @@
 #      `from fbpic import picmi`
 #      `from warp import picmi`
 # from fbpic import picmi
-import picmi_qpad as picmi
+# import picmi_qpad as picmi
+# import picmi_osiris as picmi
 import numpy as np
 # Create alias fror constants
 cst = picmi.constants
@@ -26,7 +27,7 @@ laser_focal_distance = 100.e-6   # Focal distance from the injection (in meters)
 laser_t_peak         = 30.e-15   # The time at which the laser reaches its peak
                                  # at the antenna injection location (in seconds)
 
-plasma_density = 1.74e21 * 1e6
+# plasma_density = 1.74e21 * 1e6
 plasma_density = 4.2 * 1e17 * 1e6
 w_pe = np.sqrt(cst.q_e**2 * plasma_density/(cst.ep0 * cst.m_e))
 k_pe = w_pe/cst.c
@@ -79,9 +80,9 @@ if picmi.codename == 'fbpic':
     geometry = 'RZ'
     n_macroparticle_per_cell = [2, 4, 2]
     # number of particle per cell in the r, theta, z direction respectively
-elif picmi.codename == 'QPAD':
-    em_solver_methdo = 'Yee'
-    geometry = 'RZ'
+elif picmi.codename == 'QPAD' or picmi.codename =='OSIRIS':
+    em_solver_method = 'Yee'
+    geometry = '3D'
     n_macroparticle_per_cell = [2, 4, 2]
 
 # Physics part - can be in separate file
@@ -107,18 +108,29 @@ plasma_dist = picmi.AnalyticDistribution(
                 lower_bound        = plasma_min,
                 upper_bound        = plasma_max,
                 fill_in            = True)
-# plasma = picmi.MultiSpecies(
-#                 particle_types = ['He', 'Ar', 'electron'],
-#                 names          = ['He+', 'Argon', 'e-'],
-#                 charge_states  = [1, 5, None],
-#                 proportions    = [0.2, 0.8, 0.2 + 5*0.8],
-#                 initial_distribution=plasma_dist)
+
+# plasma = picmi.Species(particle_type = 'Ar', 
+#                       charge_state = 5,
+#                       name = 'plasma',
+#                       initial_distribution = plasma_dist)
 plasma = picmi.MultiSpecies(
-                particle_types = ['electron','He', 'Ar'],
-                names          = [ 'e-','He+', 'Argon'],
-                charge_states  = [None,1, 5],
-                proportions    = [ 0.2 + 5*0.8,0.2, 0.8],
+                particle_types = ['He', 'Ar', 'electron'],
+                names          = ['He+', 'Argon', 'e-'],
+                charge_states  = [1, 5, None],
+                proportions    = [0.2, 0.8, 0.2 + 5*0.8],
                 initial_distribution=plasma_dist)
+# plasma = picmi.MultiSpecies(
+#                 particle_types = ['electron','He', 'Ar'],
+#                 names          = [ 'e-','He+', 'Argon'],
+#                 charge_states  = [None,1, 5],
+#                 proportions    = [ 0.2 + 5*0.8,0.2, 0.8],
+#                 initial_distribution=plasma_dist)
+
+
+
+# plasma = picmi.Species(particle_type = 'electron', 
+#                         name = 'plasma',
+#                         initial_distribution = plasma_dist)
 
 # --- electron bunch
 beam_dist = picmi.GaussianBunchDistribution(
@@ -133,7 +145,7 @@ beam = picmi.Species( particle_type        = 'electron',
 
 # Numerics components
 # -------------------
-
+# applied_field = picmi.ConstantAppliedField(Ez = 1.0, upper_bound = [1,1,10], lower_bound =[-1,-1,0])
 if geometry == '3D':
     grid = picmi.Cartesian3DGrid(
         number_of_cells           = [nx, ny, nz],
@@ -143,12 +155,13 @@ if geometry == '3D':
         upper_boundary_conditions = ['periodic', 'periodic', 'open'],
         moving_window_velocity    = moving_window_velocity,
         warpx_max_grid_size       = 32)
+    cpu_split = [4,4,32]
         # Note that code-specific arguments use the code name as a prefix.
 elif geometry == 'RZ':
     # In the following lists:
     # - the first element corresponds to the radial direction
     # - the second element corresponds to the longitudinal direction
-    if(picmi.codename == 'QPAD'):
+    if(picmi.codename == 'QPAD' or picmi.codename == 'OSIRIS'):
         grid = picmi.CylindricalGrid(
             number_of_cells           = [nx//2, nz],
             lower_bound               = [0., zmin],
@@ -169,6 +182,7 @@ elif geometry == 'RZ':
             n_azimuthal_modes         = 2,
             moving_window_velocity    = moving_window_velocity,
             warpx_max_grid_size       = 32)
+    cpu_split = [4,32]
 
 smoother = picmi.BinomialSmoother( n_pass = 1, compensation = False )
 solver = picmi.ElectromagneticSolver( grid            = grid,
@@ -180,29 +194,31 @@ solver = picmi.ElectromagneticSolver( grid            = grid,
 # -----------
 field_diag = picmi.FieldDiagnostic(data_list = ["rho", "E", "B", "J"],
                                     grid = grid,
-                                    period = 1,
+                                    period = 200,
                                     warpx_plot_raw_fields = 1,
                                     warpx_plot_raw_fields_guards = 1,
                                     warpx_plot_finepatch = 1,
                                     warpx_plot_crsepatch = 1)
-part_diag = picmi.ParticleDiagnostic(period = 1,
+part_diag = picmi.ParticleDiagnostic(period = 200,
                                       species = [beam])
 
 # Simulation setup
 # -----------------
 
+# dt = (1.0/100.0) * laser_wavelength/cst.c
+dt = 0.005/w_pe
+# dt = dx/cst.c *
+tmax = (laser_focal_distance + laser_injection_loc)/cst.c
+
+## normalizing factor
 sim_dict ={}
-dt = 1/w_pe
-tmax = 20/w_pe
-if(picmi.codename == 'QPAD'):
+if(picmi.codename == 'QPAD' or picmi.codename == 'OSIRIS'):
     sim_dict[picmi.codename + '_n0'] = plasma_density
-    sim_dict['max_time'] = tmax
-    sim_dict['time_step_size'] = dt
-    sim_dict['cpu_split'] = [4,4]
 
 # Initialize the simulation object
 # Note that the time step size is obtained from the solver
-sim = picmi.Simulation(solver = solver, verbose = 1, **sim_dict)
+sim = picmi.Simulation(solver = solver, verbose = 1, cpu_split = cpu_split,
+                    time_step_size = dt, max_time = tmax, **sim_dict)
 
 # Inject the laser through an antenna
 antenna = picmi.LaserAntenna(
@@ -217,13 +233,23 @@ plasma_layout = picmi.GriddedLayout(
 sim.add_species(species=plasma, layout=plasma_layout)
 
 # Add the beam
-beam_layout = picmi.PseudoRandomLayout(
-                n_macroparticles = 10**5,
+if(picmi.codename == 'OSIRIS'):
+    beam_layout = picmi.PseudoRandomLayout(
+                n_macroparticles_per_cell = n_macroparticle_per_cell,
                 seed = 0)
+else:
+    beam_layout = picmi.PseudoRandomLayout(
+                n_macroparticles = 1e5,
+                seed = 0)
+# Add the beam
+
+
+
 sim.add_species(species=beam, layout=beam_layout, 
                 initialize_self_field=False)
 
 # Add the diagnostics
+# sim.add_applied_field(applied_field)
 sim.add_diagnostic(field_diag)
 sim.add_diagnostic(part_diag)
 
@@ -236,5 +262,8 @@ else:
     # `write_inputs` will create an input file that can be used to run
     # with the compiled version.
     sim.set_max_step(max_steps)
-    sim.write_input_file(file_name='input_script.json')
+    if(picmi.codename == 'OSIRIS'):
+        sim.write_input_file(file_name='os-stdin')
+    else:
+        sim.write_input_file(file_name='input_script.json')
 
