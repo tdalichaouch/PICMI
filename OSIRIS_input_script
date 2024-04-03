@@ -213,9 +213,14 @@ diag_species
  
 zpulse_mov_wall
 { 
-	tenv_type = 'polynomial',
+	tenv_type = 'gaussian',
+	xi0 = 1.0975845438645269,
+	wall_pos = 1.0975845438645269,
+	tenv_duration = 0.7602613140501312,
+	tenv_launch_duration = 2.1936504551197022,
+	tenv_range = 2.1936504551197022,
 	propagation = 'forward',
-	wall_vel = -0.99,
+	wall_vel = 0,
 	a0 = 4.0,
 	omega0 = 64.40126649095288,
 	per_w0 = 0.6097691910358484,0.6097691910358484,
@@ -223,10 +228,6 @@ zpulse_mov_wall
 	per_center = 0.0,0.0,
 	pol = 90.0,
 	per_focus = 13.292968364581494,
-	tenv_rise = 0.8377002675488363,
-	tenv_fall = 0.8377002675488363,
-	wall_pos = 0.838459583853512,
-	xi0 = 0.838459583853512,
 	ncells = 11,
 } 
  

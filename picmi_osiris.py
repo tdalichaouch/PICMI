@@ -841,6 +841,8 @@ class Simulation(picmistandard.PICMI_Simulation):
 		picmistandard.PICMI_Simulation.add_laser(self, laser, injection_method)
 		if(self.n0 is not None):
 			laser.normalize_units(self.n0)
+			if(injection_method is not None):
+				injection_method.normalize_units(self.n0)
 
 
 			
@@ -1165,7 +1167,10 @@ class GaussianLaser(picmistandard.PICMI_GaussianLaser):
 
 
 	def fill_dict(self,keyvals,grid):
-		keyvals['lon_type'] = "polynomial"
+		keyvals['lon_type'] = "gaussian"
+		keyvals['lon_duration'] = self.duration * 2 * np.log(2.0)
+		keyvals['lon_x0'] = self.centroid_position[0]
+		keyvals['lon_range'] = 4 * self.duration 
 		if(self.propagation_direction[0] > 0):
 			keyvals['propagation'] = 'forward'
 		else:
@@ -1180,19 +1185,22 @@ class GaussianLaser(picmistandard.PICMI_GaussianLaser):
 		keyvals['per_center'] = self.centroid_position[1:]
 		keyvals['pol'] = np.arctan2(self.polarization_direction[1], self.polarization_direction[0])/ np.pi * 180.0
 		keyvals['per_focus'] = self.focal_position[0]
-		keyvals['lon_rise'] = self.duration * 1.5275
-		keyvals['lon_fall'] = self.duration * 1.5275
-		keyvals['lon_flat'] = 0
-		keyvals['lon_start'] = self.centroid_position[0] + keyvals['lon_rise']
+		
 
 	def fill_antenna_dict(self,keyvals,grid, injection_method):
-		keyvals['tenv_type'] = "polynomial"
+		keyvals['tenv_type'] = "gaussian"
+		keyvals['xi0'] = injection_method.position[0]
+		keyvals['wall_pos'] = injection_method.position[0]
+		keyvals['tenv_duration'] = self.duration * 2 * np.log(2.0)
+		keyvals['tenv_launch_duration'] = 2 * np.abs(injection_method.position[0] - self.centroid_position[0])
+		keyvals['tenv_range'] = keyvals['tenv_launch_duration']
+
 		if(self.propagation_direction[0] > 0):
 			keyvals['propagation'] = 'forward'
-			keyvals['wall_vel'] = -0.99
+			keyvals['wall_vel'] = 0
 		else:
 			keyvals['propagation'] = 'backward'
-			keyvals['wall_vel'] = 0.99
+			keyvals['wall_vel'] = 0.0
 		keyvals['a0'] = self.a0
 		keyvals['omega0'] = self.k0
 		if(grid.n_x_dim > 2):
@@ -1203,16 +1211,23 @@ class GaussianLaser(picmistandard.PICMI_GaussianLaser):
 		keyvals['per_center'] = self.centroid_position[1:]
 		keyvals['pol'] = np.arctan2(self.polarization_direction[1], self.polarization_direction[0])/ np.pi * 180.0
 		keyvals['per_focus'] = self.focal_position[0]
-		keyvals['tenv_rise'] = self.duration * 1.5275
-		keyvals['tenv_fall'] = self.duration * 1.5275
-		keyvals['wall_pos'] = self.centroid_position[0] + keyvals['tenv_rise']
-		keyvals['xi0'] = keyvals['wall_pos']
+		
 		keyvals['ncells'] = 11
 
 		
 class LaserAntenna(picmistandard.PICMI_LaserAntenna):
 	def init(self, kw):
+		self.position = [self.position[2],self.position[1],self.position[0]]
+		self.normal_vector = [self.normal_vector[2],self.normal_vector[1],self.normal_vector[0]]
+		assert np.any(self.position[1:] != 0), Exception("OSIRIS PICMI currently only supports Antenna injection along z")
+		assert np.any(self.normal_vector[1:] != 0), Exception("OSIRIS PICMI currently only supports Antenna injection along z")
 		return
+	def normalize_units(self, density_norm):
+		# normalize quantities to plasma density and skin depths
+		w_pe = np.sqrt(constants.q_e**2 * density_norm/(constants.ep0 * constants.m_e) ) 
+		k_pe = w_pe/constants.c
+		for i in range(3):
+			self.position[i] = k_pe * self.position[i]
 
 class BinomialSmoother(picmistandard.PICMI_BinomialSmoother):
 	def init(self, kw):
