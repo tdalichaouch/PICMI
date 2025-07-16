@@ -1,0 +1,253 @@
+simulation
+{ 
+	n0 = 4.2e+17,
+} 
+ 
+node_conf
+{ 
+	node_number = 4,2,2,
+	if_periodic = .false.,.true.,.true.,
+} 
+ 
+grid
+{ 
+	nx_p = 480,64,64,
+	coordinates = 'cartesian',
+} 
+ 
+time_step
+{ 
+	dt = 0.006097691910392264,
+	ndump = 1,
+} 
+ 
+restart
+{ 
+	ndump_fac = 0,
+	if_restart = .false.,
+	if_remold = .true.,
+} 
+ 
+space
+{ 
+	xmin = -4.634245851872447,-3.65861514621509,-3.65861514621509,
+	xmax = 1.2195383820716967,3.65861514621509,3.65861514621509,
+	if_move = .true.,.false.,.false.,
+} 
+ 
+time
+{ 
+	tmin = 0,
+	tmax = 12.195383820784528,
+} 
+ 
+el_mag_fld
+{ 
+	solver = 'yee',
+} 
+ 
+emf_bound
+{ 
+	type(:,1) = 'lindman','lindman',
+} 
+ 
+emf_solver
+{ 
+} 
+ 
+diag_emf
+{ 
+	reports = 'e3','e1',
+	ndump_fac = 200,
+} 
+ 
+particles
+{ 
+	num_species = 4,
+	num_neutral = 0,
+	interpolation = 'linear',
+} 
+ 
+species
+{ 
+	name = 'He+',
+	free_stream = .false.,
+	rqm = 7295.295853865013,
+	num_par_x = 4,2,2,
+} 
+ 
+udist
+{ 
+	uth = 0.0,0.0,0.0,
+	ufl = 0.0,0.0,0.0,
+	use_classical_uadd = .true.,
+} 
+ 
+profile
+{ 
+	density = 0.2,
+	profile_type = 'math func',
+	math_func_expr = 'if(x1<= (1.219538e+02)  && x1>= (0.000000e+00)  && x2<= (2.439077e+00)  && x2>= (-2.439077e+00)  && x3<= (2.439077e+00)  && x3>= (-2.439077e+00) ,1.e23*(1+tanh(((8.199824e-06* x1)-20.e-6)/10.e-6))/2./4.2e+23, 0 )',
+} 
+ 
+spe_bound
+{ 
+	type(:,1) = 'open','open',
+	type(:,2) = 'periodic','periodic',
+	type(:,3) = 'periodic','periodic',
+} 
+ 
+diag_species
+{ 
+	reports = 'charge',
+	ndump_fac = 200,
+} 
+ 
+species
+{ 
+	name = 'Argon',
+	free_stream = .false.,
+	rqm = 14564.147353330369,
+	num_par_x = 4,2,2,
+} 
+ 
+udist
+{ 
+	uth = 0.0,0.0,0.0,
+	ufl = 0.0,0.0,0.0,
+	use_classical_uadd = .true.,
+} 
+ 
+profile
+{ 
+	density = 4.0,
+	profile_type = 'math func',
+	math_func_expr = 'if(x1<= (1.219538e+02)  && x1>= (0.000000e+00)  && x2<= (2.439077e+00)  && x2>= (-2.439077e+00)  && x3<= (2.439077e+00)  && x3>= (-2.439077e+00) ,1.e23*(1+tanh(((8.199824e-06* x1)-20.e-6)/10.e-6))/2./4.2e+23, 0 )',
+} 
+ 
+spe_bound
+{ 
+	type(:,1) = 'open','open',
+	type(:,2) = 'periodic','periodic',
+	type(:,3) = 'periodic','periodic',
+} 
+ 
+diag_species
+{ 
+	reports = 'charge',
+	ndump_fac = 200,
+} 
+ 
+species
+{ 
+	name = 'e-',
+	free_stream = .false.,
+	rqm = -1.0,
+	num_par_x = 4,2,2,
+} 
+ 
+udist
+{ 
+	uth = 0.0,0.0,0.0,
+	ufl = 0.0,0.0,0.0,
+	use_classical_uadd = .true.,
+} 
+ 
+profile
+{ 
+	density = 4.2,
+	profile_type = 'math func',
+	math_func_expr = 'if(x1<= (1.219538e+02)  && x1>= (0.000000e+00)  && x2<= (2.439077e+00)  && x2>= (-2.439077e+00)  && x3<= (2.439077e+00)  && x3>= (-2.439077e+00) ,1.e23*(1+tanh(((8.199824e-06* x1)-20.e-6)/10.e-6))/2./4.2e+23, 0 )',
+} 
+ 
+spe_bound
+{ 
+	type(:,1) = 'open','open',
+	type(:,2) = 'periodic','periodic',
+	type(:,3) = 'periodic','periodic',
+} 
+ 
+diag_species
+{ 
+	reports = 'charge',
+	ndump_fac = 200,
+} 
+ 
+species
+{ 
+	name = 'beam',
+	free_stream = .false.,
+	rqm = -1.0,
+	num_par_x = 4,2,2,
+} 
+ 
+udist
+{ 
+	uth = 10.0,0.0,0.0,
+	ufl = 1000.0,0.0,0.0,
+	use_classical_uadd = .true.,
+	n_accelerate = 512,
+} 
+ 
+profile
+{ 
+	profile_type = 'gaussian','gaussian','gaussian',
+	gauss_center = -2.6829844,0.0,0.0,
+	gauss_sigma = 0.12195384,0.12195384,0.12195384,
+	density = 15.117532,
+	gauss_range(:,1) = -3.1707998,-2.1951691,
+	gauss_range(:,2) = -0.48781535,0.48781535,
+	gauss_range(:,3) = -0.48781535,0.48781535,
+} 
+ 
+spe_bound
+{ 
+	type(:,1) = 'open','open',
+	type(:,2) = 'periodic','periodic',
+	type(:,3) = 'periodic','periodic',
+} 
+ 
+diag_species
+{ 
+	reports = 'charge',
+	ndump_fac = 200,
+	ndump_fac_raw = 200,
+	raw_fraction = 1,
+} 
+ 
+zpulse_mov_wall
+{ 
+	tenv_type = 'gaussian',
+	xi0 = 1.0975845438645269,
+	wall_pos = 1.0975845438645269,
+	tenv_duration = 0.7602613140501312,
+	tenv_launch_duration = 2.1936504551197022,
+	tenv_range = 2.1936504551197022,
+	propagation = 'forward',
+	wall_vel = 0,
+	a0 = 4.0,
+	omega0 = 64.40126649095288,
+	per_w0 = 0.6097691910358484,0.6097691910358484,
+	per_type = 'gaussian',
+	per_center = 0.0,0.0,
+	pol = 90.0,
+	per_focus = 13.292968364581494,
+	ncells = 11,
+} 
+ 
+current
+{ 
+} 
+ 
+smooth
+{ 
+	type = 'binomial','binomial','binomial',
+	order = 1,1,1,
+} 
+ 
+diag_current
+{ 
+	reports = 'j1',
+	ndump_fac = 200,
+} 
+ 

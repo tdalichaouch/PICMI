@@ -1,0 +1,254 @@
+{
+    "simulation": {
+        "nodes": [
+            8,
+            16
+        ],
+        "grid": [
+            256,
+            438
+        ],
+        "max_mode": 1,
+        "box": {
+            "r": [
+                0.0,
+                9.395847
+            ],
+            "z": [
+                -3.0,
+                6.6
+            ]
+        },
+        "field_boundary": "open",
+        "time": 20188.279,
+        "dt": 10.0,
+        "interpolation": "linear",
+        "n0": 1e+16,
+        "nbeams": 2,
+        "nspecies": 1,
+        "nneutrals": 0,
+        "nlasers": 0,
+        "iter_max": 10,
+        "iter_reltol": 0.001,
+        "iter_abstol": 0.001,
+        "relax_fac": 0.0033676888,
+        "dump_restart": false,
+        "read_restart": false,
+        "verbose": 1,
+        "if_timing": false,
+        "random_seed": 10,
+        "algorithm": "standard"
+    },
+    "beam": [
+        {
+            "npmax": 2000000,
+            "ppc": [
+                2,
+                1,
+                2
+            ],
+            "num_theta": 8,
+            "random_theta": false,
+            "evolution": true,
+            "quiet_start": true,
+            "geometry": "cartesian",
+            "q": -1.0,
+            "m": 1.0,
+            "density": 93.538365,
+            "profile": [
+                "gaussian",
+                "gaussian",
+                "gaussian"
+            ],
+            "gamma": 19569.47,
+            "gauss_center": [
+                0.0,
+                0.0,
+                -0.0
+            ],
+            "perp_offset_x": [
+                0,
+                0.0,
+                0
+            ],
+            "perp_offset_y": [
+                0,
+                0.0,
+                0
+            ],
+            "push_type": "reduced",
+            "alpha": [
+                0,
+                0
+            ],
+            "gauss_sigma": [
+                0.1370883,
+                0.1370883,
+                0.47966791
+            ],
+            "range1": [
+                -0.54835319,
+                0.54835319
+            ],
+            "range2": [
+                -0.54835319,
+                0.54835319
+            ],
+            "range3": [
+                -1.9186716,
+                1.9186716
+            ],
+            "uth": [
+                13.560475,
+                13.560475,
+                0.0
+            ],
+            "diag": [
+                {
+                    "name": [
+                        "charge_cyl_m"
+                    ],
+                    "ndump": 10
+                },
+                {
+                    "name": [
+                        "raw"
+                    ],
+                    "ndump": 10,
+                    "psample": 1
+                }
+            ]
+        },
+        {
+            "npmax": 2000000,
+            "ppc": [
+                2,
+                1,
+                2
+            ],
+            "num_theta": 8,
+            "random_theta": false,
+            "evolution": true,
+            "quiet_start": true,
+            "geometry": "cartesian",
+            "q": -1.0,
+            "m": 1.0,
+            "density": 56.033681,
+            "profile": [
+                "gaussian",
+                "gaussian",
+                "gaussian"
+            ],
+            "gamma": 19569.47,
+            "gauss_center": [
+                0.0,
+                0.0,
+                5.6453657
+            ],
+            "perp_offset_x": [
+                0,
+                0.037635772,
+                0
+            ],
+            "perp_offset_y": [
+                0,
+                0.0,
+                0
+            ],
+            "push_type": "reduced",
+            "alpha": [
+                0,
+                0
+            ],
+            "gauss_sigma": [
+                0.1370883,
+                0.1370883,
+                0.23973986
+            ],
+            "range1": [
+                -0.54835319,
+                0.54835319
+            ],
+            "range2": [
+                -0.54835319,
+                0.54835319
+            ],
+            "range3": [
+                4.6864063,
+                6.6043252
+            ],
+            "uth": [
+                13.560475,
+                13.560475,
+                0.0
+            ],
+            "diag": [
+                {
+                    "name": [
+                        "charge_cyl_m"
+                    ],
+                    "ndump": 10
+                },
+                {
+                    "name": [
+                        "raw"
+                    ],
+                    "ndump": 10,
+                    "psample": 1
+                }
+            ]
+        }
+    ],
+    "species": [
+        {
+            "npmax": 2000000,
+            "ppc": [
+                4,
+                1
+            ],
+            "num_theta": 8,
+            "random_theta": false,
+            "push_type": "robust",
+            "q": -1.0,
+            "m": 1.0,
+            "density": 1.0,
+            "profile": [
+                "uniform",
+                "piecewise-linear"
+            ],
+            "uth": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "piecewise_s": [
+                0.0,
+                37635.772
+            ],
+            "piecewise_fs": [
+                1.0,
+                1.0
+            ],
+            "diag": [
+                {
+                    "name": [
+                        "charge_cyl_m"
+                    ],
+                    "ndump": 10
+                }
+            ]
+        }
+    ],
+    "field": {
+        "diag": [
+            {
+                "name": [
+                    "er_cyl_m",
+                    "ez_cyl_m",
+                    "bphi_cyl_m"
+                ],
+                "ndump": 10
+            }
+        ]
+    }
+}
