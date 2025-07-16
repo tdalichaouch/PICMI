@@ -62,7 +62,7 @@ ppc_plasma, num_theta_plasma  = [4, 1], 8 # 4 ppc in r, 8 in phi
 
 
 # PATH to QPAD executables (qpad.e)
-path_to_qpad = ''  
+path_to_qpad = 'd'  
 assert path_to_qpad, Exception('Need to specify path_to_qpad')
 
 #################### mkdir sim folder ####################
@@ -76,32 +76,27 @@ def run_qpad_sim1(z, gas_density):
 	from UTILITY_QPAD import QPAD_sim
 	sim1 = QPAD_sim(n0)
 	kp, wp = sim1.kp, sim1.wp 
-	sim1.init_grid(nr = nr, nz = nz, rmin = 0, rmax = rmax/kp, zmin = zmin/kp,\
-	 zmax = zmax/kp, n_modes = n_modes)
+	sim1.init_grid(nr = nr, nz = nz, rmin = 0, rmax = rmax/kp, zmin = zmin/kp, zmax = zmax/kp, n_modes = n_modes)
 
 	# add drive bunch
-	sim1.add_gaussian_electron_bunch(beam1_charge, beam1_sigmas, ppc = ppc_beam,\
-	 num_theta = num_theta_beam, bunch_rms_velocity = rms_vel,\
-	  bunch_centroid_velocity = [0, 0, gamma], alpha = alpha)
-
+	sim1.add_gaussian_electron_bunch(beam1_charge, beam1_sigmas, ppc = ppc_beam, num_theta = num_theta_beam, \
+		bunch_rms_velocity = rms_vel, bunch_centroid_velocity = [0, 0, gamma], alpha = alpha)
 	# add trailing bunch
-	sim1.add_gaussian_electron_bunch(beam2_charge, beam2_sigmas,ppc = ppc_beam,\
-	  num_theta = num_theta_beam, bunch_rms_velocity = rms_vel,\
-	   bunch_centroid_velocity = [0, 0, gamma], bunch_centroid_position = beam2_centroid_position,\
+	sim1.add_gaussian_electron_bunch(beam2_charge, beam2_sigmas,ppc = ppc_beam,  num_theta = num_theta_beam, \
+		bunch_rms_velocity = rms_vel, bunch_centroid_velocity = [0, 0, gamma], bunch_centroid_position = beam2_centroid_position,\
 									 alpha = alpha)
 
 	# add pre-ionized plasma
-	sim1.add_longitudinal_plasma(z, gas_density, ppc=ppc_plasma, num_theta = num_theta_plasma) 
+	sim1.add_longitudinal_plasma(z, gas_density, ppc=ppc_plasma, num_theta = num_theta_plasma) # only consider first level of Hydrogen
 	
 	# QPAD diag info
-	sim1.add_field_diagnostics(data_list = ['Ez', 'Er', 'Bphi', 'rho'], period = ndump_diag) # dump fields
+	sim1.add_field_diagnostics(data_list = ['Ez', 'Er', 'Bphi', 'rho'], period = ndump_diag) # 
 	sim1.add_particle_diagnostics(period = ndump_diag, psample =1) # sample every particle
 
 	zsim1 = 20000.1/kp # 1 meter
 
 	print('Running 1st leg QPAD sim (output in ' + sim_dir+ '/output.txt)...')
-	sim1.run_simulation(dt = dt_qpad/wp, tmax = (zsim1 + 0.01)/cst.c, nodes = QPAD_nodes,\
-	 sim_dir = sim_dir, path_to_qpad = path_to_qpad)
+	sim1.run_simulation(dt = dt_qpad/wp, tmax = (zsim1 + 0.01)/cst.c, nodes = QPAD_nodes, sim_dir = sim_dir, path_to_qpad = path_to_qpad)
 
 run_qpad_sim1(z,gas_density)
 
