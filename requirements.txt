@@ -1,0 +1,10 @@
+# picmistandard 0.35+ is a breaking change (pydantic refactor):
+# https://github.com/picmi-standard/picmi/pull/133
+# keep in sync with the version checks in picmi_scripts/picmi_*.py
+picmistandard<=0.34.0
+numpy
+scipy
+h5py
+periodictable
+openpmd-beamphysics
+matplotlib

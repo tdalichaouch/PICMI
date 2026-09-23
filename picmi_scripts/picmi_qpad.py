@@ -12,6 +12,11 @@ import periodictable
 from decimal import Decimal
 import importlib
 
+# To Do: migrate to PICMI 0.35+ https://github.com/picmi-standard/picmi/pull/133
+if tuple(map(int, re.findall(r'\d+', picmistandard.__version__)[:3])) > (0, 34, 0):
+	raise ImportError('picmistandard<=0.34.0 required, found ' + picmistandard.__version__ +
+		' in ' + picmistandard.__file__)
+
 importlib.reload(picmistandard)
 encoder.FLOAT_REPR = lambda o: format(o, '.4f')
 
