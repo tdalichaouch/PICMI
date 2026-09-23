@@ -2,6 +2,7 @@
 # QPAD FACET extension of PICMI standard
 
 import picmistandard
+from pydantic import Field, PrivateAttr
 import numpy as np
 import re
 import math
@@ -12,9 +13,9 @@ import periodictable
 from decimal import Decimal
 import importlib
 
-# To Do: migrate to PICMI 0.35+ https://github.com/picmi-standard/picmi/pull/133
-if tuple(map(int, re.findall(r'\d+', picmistandard.__version__)[:3])) > (0, 34, 0):
-	raise ImportError('picmistandard<=0.34.0 required, found ' + picmistandard.__version__ +
+# PICMI 0.35+ with pydantic classes: https://github.com/picmi-standard/picmi/pull/133
+if tuple(map(int, re.findall(r'\d+', picmistandard.__version__)[:3])) < (0, 35, 0):
+	raise ImportError('picmistandard>=0.35.0 required, found ' + picmistandard.__version__ +
 		' in ' + picmistandard.__file__)
 
 importlib.reload(picmistandard)
@@ -60,8 +61,18 @@ class Neutral(picmistandard.PICMI_Species):
 
 
 	"""
+	ion_max: int | None = Field(default=None, alias=codename + '_ion_max',
+		description='Maximum ionization level (defaults to the atomic number)')
+
+	_element: int | None = PrivateAttr(default=None)
+	_profile_type: str | None = PrivateAttr(default=None)
+	_push_type: str | None = PrivateAttr(default=None)
+	_q: float | None = PrivateAttr(default=None)
+	_m: float | None = PrivateAttr(default=None)
+
 	# initialization 
-	def init(self, kw):
+	def model_post_init(self, context):
+		super().model_post_init(context)
 		
 		# self.charge = self.charge_state * constants.q_e
 		self.charge = -constants.q_e
@@ -78,46 +89,47 @@ class Neutral(picmistandard.PICMI_Species):
 				# Note that not all valid charge states are defined in elements,
 				# so this value error can be ignored.
 				pass
-		self.element = element.number
-		self.ion_max = kw.pop(codename + '_ion_max', self.element)
+		self._element = element.number
+		if(self.ion_max is None):
+			self.ion_max = self._element
 
 		# set profile type
 		
 		if(isinstance(self.initial_distribution, UniformDistribution)):
-			self.profile_type = 'neutral'
-			self.push_type = 'robust'
+			self._profile_type = 'neutral'
+			self._push_type = 'robust'
 		elif(isinstance(self.initial_distribution, AnalyticDistribution)):
-			self.profile_type = 'neutral'
-			self.push_type = 'robust'
+			self._profile_type = 'neutral'
+			self._push_type = 'robust'
 		elif(isinstance(self.initial_distribution, PiecewiseDistribution)):
-			self.profile_type = 'neutral'
-			self.push_type = 'robust'
+			self._profile_type = 'neutral'
+			self._push_type = 'robust'
 		else:
 			print('Warning: Only Uniform, Analytic, and Piecewise distributions are currently supported.')
 
 
 	def normalize_units(self):
 		# normalized charge, mass, density
-		self.q = self.charge/constants.q_e
-		self.m = self.mass/constants.m_e
+		self._q = self.charge/constants.q_e
+		self._m = self.mass/constants.m_e
 
 
 
 	def fill_dict(self, keyvals, if_lasers):
 		if(if_lasers):
-			keyvals['push_type'] = self.push_type + '_pgc'
+			keyvals['push_type'] = self._push_type + '_pgc'
 		else:
-			keyvals['push_type'] = self.push_type
-		keyvals['q'] = self.q
-		keyvals['m'] = self.m
-		keyvals['element'] = self.element
+			keyvals['push_type'] = self._push_type
+		keyvals['q'] = self._q
+		keyvals['m'] = self._m
+		keyvals['element'] = self._element
 		keyvals['ion_max'] = self.ion_max
 		q_scale = np.abs(self.charge/constants.q_e)
 		if(not isinstance(self.initial_distribution, FileDistribution)):
 			if(self.density_scale is not None):
-				keyvals['density'] = self.initial_distribution.norm_density *self.density_scale * q_scale
+				keyvals['density'] = self.initial_distribution._norm_density *self.density_scale * q_scale
 			else:
-				keyvals['density'] = self.initial_distribution.norm_density * q_scale
+				keyvals['density'] = self.initial_distribution._norm_density * q_scale
 			keyvals['density'] = to_scientific_notation(keyvals['density'])
 		self.initial_distribution.fill_dict(keyvals)
 
@@ -148,8 +160,21 @@ class Species(picmistandard.PICMI_Species):
 
 
 	"""
+	beam_evolution: bool = Field(default=True, alias=codename + '_beam_evolution',
+		description='Toggles beam evolution')
+	quiet_start: bool = Field(default=True, alias=codename + '_quiet_start',
+		description='Adds image particles to suppress the statistic noise')
+
+	_element: object = PrivateAttr(default=None)
+	_profile_type: str | None = PrivateAttr(default=None)
+	_push_type: str | None = PrivateAttr(default=None)
+	_geometry: str | None = PrivateAttr(default=None)
+	_q: float | None = PrivateAttr(default=None)
+	_m: float | None = PrivateAttr(default=None)
+
 	# initialization 
-	def init(self, kw):
+	def model_post_init(self, context):
+		super().model_post_init(context)
 		part_types = {'electron': [-constants.q_e, constants.m_e] ,\
 		'positron': [constants.q_e, constants.m_e],\
 		'proton': [constants.q_e, constants.m_p],\
@@ -174,65 +199,60 @@ class Species(picmistandard.PICMI_Species):
 					# Note that not all valid charge states are defined in elements,
 					# so this value error can be ignored.
 					pass
-			self.element = element
+			self._element = element
 			if self.mass is None:
 				self.mass = element.mass*periodictable.constants.atomic_mass_constant
 
 		# print(self.charge)
 
-		# Handle optional args for beams 
-		self.beam_evolution = kw.pop(codename + '_beam_evolution', True)
-		self.quiet_start = kw.pop(codename + '_quiet_start', True)
-		
-
 		# set profile type
 		if(isinstance(self.initial_distribution, GaussianBunchDistribution)):
-			self.profile_type = 'beam'
-			self.geometry = 'cartesian'
-			self.push_type = 'reduced'
+			self._profile_type = 'beam'
+			self._geometry = 'cartesian'
+			self._push_type = 'reduced'
 		elif(isinstance(self.initial_distribution, FileDistribution)):
-			self.profile_type = 'beam'
-			self.push_type = 'reduced'
-			self.geometry = 'cartesian'
+			self._profile_type = 'beam'
+			self._push_type = 'reduced'
+			self._geometry = 'cartesian'
 		elif(isinstance(self.initial_distribution, UniformDistribution)):
-			self.profile_type = 'species'
-			self.push_type = 'robust'
+			self._profile_type = 'species'
+			self._push_type = 'robust'
 		elif(isinstance(self.initial_distribution, AnalyticDistribution)):
-			self.profile_type = 'species'
-			self.push_type = 'robust'
+			self._profile_type = 'species'
+			self._push_type = 'robust'
 		elif(isinstance(self.initial_distribution, PiecewiseDistribution)):
-			self.profile_type = 'species'
-			self.push_type = 'robust'
+			self._profile_type = 'species'
+			self._push_type = 'robust'
 		else:
 			print('Warning: Only Uniform and Gaussian distributions are currently supported.')
 
 
 	def normalize_units(self):
 		# normalized charge, mass, density
-		self.q = self.charge/constants.q_e
-		self.m = self.mass/constants.m_e
+		self._q = self.charge/constants.q_e
+		self._m = self.mass/constants.m_e
 
 
 
 	def fill_dict(self, keyvals, if_lasers):
-		if(self.profile_type == 'beam'):
+		if(self._profile_type == 'beam'):
 			keyvals['evolution'] = self.beam_evolution
 			keyvals['quiet_start'] = self.quiet_start
-			keyvals['geometry'] = self.geometry
+			keyvals['geometry'] = self._geometry
 		else:
 			if(if_lasers):
-				keyvals['push_type'] = self.push_type + '_pgc'
+				keyvals['push_type'] = self._push_type + '_pgc'
 			else:
-				keyvals['push_type'] = self.push_type
-		keyvals['q'] = self.q
-		keyvals['m'] = self.m
+				keyvals['push_type'] = self._push_type
+		keyvals['q'] = self._q
+		keyvals['m'] = self._m
 
 		q_scale = np.abs(self.charge/constants.q_e)
 		if(not isinstance(self.initial_distribution, FileDistribution)):
 			if(self.density_scale is not None):
-				keyvals['density'] = self.initial_distribution.norm_density *self.density_scale * q_scale
+				keyvals['density'] = self.initial_distribution._norm_density *self.density_scale * q_scale
 			else:
-				keyvals['density'] = self.initial_distribution.norm_density * q_scale
+				keyvals['density'] = self.initial_distribution._norm_density * q_scale
 			keyvals['density'] = to_scientific_notation(keyvals['density'])
 		self.initial_distribution.fill_dict(keyvals)
 
@@ -242,10 +262,7 @@ class Species(picmistandard.PICMI_Species):
 
 picmistandard.PICMI_MultiSpecies.Species_class = Species
 class MultiSpecies(picmistandard.PICMI_MultiSpecies):
-	def init(self, kw):
-		return
-		# for species in self.species_instances_list:
-		# 	print(species.name)
+	pass
 
 
 
@@ -267,16 +284,29 @@ class GaussianBunchDistribution(picmistandard.PICMI_GaussianBunchDistribution):
 		Species normalized densities along coordinates specified by self.fs and self.fz.
 
 	"""
-	def init(self, kw):
-		self.profile = ['gaussian', 'gaussian', 'gaussian']
-		self.piecewise_s = kw.pop(codename + '_piecewise_s', None)
-		self.piecewise_fs = kw.pop(codename + '_piecewise_fs', None)
-		self.if_piecewise = False
+	piecewise_s: list[float] | None = Field(default=None, alias=codename + '_piecewise_s',
+		description='Longitudinal coordinates of a piecewise-linear bunch profile [m]')
+	piecewise_fs: list[float] | None = Field(default=None, alias=codename + '_piecewise_fs',
+		description='Relative densities at piecewise_s')
+	alpha: float | list[float] | None = Field(default=None, alias=codename + '_alpha',
+		description='Twiss alpha of the bunch')
+
+	_profile: list | None = PrivateAttr(default=None)
+	_if_piecewise: bool = PrivateAttr(default=False)
+	_gamma: float | None = PrivateAttr(default=None)
+	_q: float | None = PrivateAttr(default=None)
+	_m: float | None = PrivateAttr(default=None)
+	_norm_density: float | None = PrivateAttr(default=None)
+	_tot_charge: float | None = PrivateAttr(default=None)
+
+	def model_post_init(self, context):
+		super().model_post_init(context)
+		self._profile = ['gaussian', 'gaussian', 'gaussian']
+		self._if_piecewise = False
 		if(self.piecewise_fs is not None and self.piecewise_s is not None):
-			self.if_piecewise = True
+			self._if_piecewise = True
 			# print('piecewise fs/s', self.piecewise_fs)
-			self.profile = ['gaussian', 'gaussian', 'piecewise-linear']
-		self.alpha = kw.pop(codename + '_alpha', None)
+			self._profile = ['gaussian', 'gaussian', 'piecewise-linear']
 
 	def normalize_units(self,species, density_norm):
 		# get charge, peak density in unnormalized units
@@ -302,20 +332,20 @@ class GaussianBunchDistribution(picmistandard.PICMI_GaussianBunchDistribution):
 			self.rms_velocity[i] /= constants.c 
 			self.centroid_velocity[i] /= constants.c
 
-		if(self.if_piecewise):
+		if(self._if_piecewise):
 			self.piecewise_s = [i * k_pe for i in self.piecewise_s]
-		self.gamma = self.centroid_velocity[2]
+		self._gamma = self.centroid_velocity[2]
 		self.centroid_position[2] *= -1
 		# normalized charge, mass, density
-		self.q = species.charge/constants.q_e
-		self.m = species.mass/constants.m_e
-		self.norm_density = peak_density/density_norm
+		self._q = species.charge/constants.q_e
+		self._m = species.mass/constants.m_e
+		self._norm_density = peak_density/density_norm
 
-		self.tot_charge = total_charge/(-constants.q_e * density_norm * k_pe**-3)
+		self._tot_charge = total_charge/(-constants.q_e * density_norm * k_pe**-3)
 
 	def fill_dict(self,keyvals):
-		keyvals['profile'] = self.profile
-		keyvals['gamma'] = to_scientific_notation(self.gamma)
+		keyvals['profile'] = self._profile
+		keyvals['gamma'] = to_scientific_notation(self._gamma)
 		# keyvals['gauss_center'] = [to_scientific_notation(i) for i in self.centroid_position]
 		centroid_ = [0, 0, self.centroid_position[2]]
 		keyvals['gauss_center'] = [to_scientific_notation(i) for i in centroid_]
@@ -327,7 +357,7 @@ class GaussianBunchDistribution(picmistandard.PICMI_GaussianBunchDistribution):
 		# keyvals['total_charge'] = self.tot_charge
 		# QPAD coordinate in xi = ct-z
 
-		if(self.if_piecewise):
+		if(self._if_piecewise):
 			keyvals['piecewise_fx3'] = self.piecewise_fs
 			keyvals['piecewise_x3'] = self.piecewise_s
 			rms_size_ = [to_scientific_notation(i) for i in self.rms_bunch_size]
@@ -351,7 +381,7 @@ class GaussianBunchDistribution(picmistandard.PICMI_GaussianBunchDistribution):
 		keyvals['uth'] = [to_scientific_notation(i) for i in self.rms_velocity]
 		
 
-class FileDistribution(picmistandard.base._ClassWithInit):
+class FileDistribution(picmistandard.PICMI_DistributionExtension):
 	"""
 	QPAD-Specific Parameters
 	
@@ -372,13 +402,18 @@ class FileDistribution(picmistandard.base._ClassWithInit):
 		Radial range (i.e. QPAD_r_min <= r <= QPAD_r_max) for particles in UniformDistribution. Only required when specifying transverse lower_bounds or upper_bounds.
  
 	"""
-	def __init__(self, filename = None, beam_center = [0, 0 ,0], file_center = [0, 0, 0], has_spin = False, **kw):
-		self.filename = filename
-		self.beam_center = beam_center
-		self.file_center = file_center
-		self.has_spin = has_spin
-		self.npmax = kw.pop(codename + '_npmax', 2*10**6)
-		self.handle_init(kw)
+	filename: str | None = Field(default=None, description='Beam file (HDF5) in QPAD units')
+	beam_center: list[float] = Field(default_factory=lambda: [0, 0 ,0],
+		description='Position of the beam center [m]')
+	file_center: list[float] = Field(default_factory=lambda: [0, 0, 0],
+		description='Position of the beam center in the file [m]')
+	has_spin: bool = Field(default=False, description='Whether the file contains spin data')
+	npmax: int = Field(default=2*10**6, alias=codename + '_npmax',
+		description='Particle buffer size per MPI partition')
+
+	def __init__(self, filename = None, **kw):
+		# keep filename as the (optional) positional argument of the pre-pydantic signature
+		super().__init__(filename=filename, **kw)
 		
 
 
@@ -424,15 +459,15 @@ class UniformDistribution(picmistandard.PICMI_UniformDistribution):
 		Radial range (i.e. QPAD_r_min <= r <= QPAD_r_max) for particles in UniformDistribution. Only required when specifying transverse lower_bounds or upper_bounds.
  
 	"""
-	def init(self,kw):
-		# default profile for uniform plasmas
-		self.profile = ['uniform', 'uniform']
+	# default profile for uniform plasmas
+	_profile: list = PrivateAttr(default_factory=lambda: ['uniform', 'uniform'])
+	_norm_density: float | None = PrivateAttr(default=None)
 		
 
 
 	def normalize_units(self,species, density_norm):
 		# normalize plasma density
-		self.norm_density = self.density/density_norm
+		self._norm_density = self.density/density_norm
 
 		# normalized charge, mass, density
 		# self.q = species.charge/constants.q_e
@@ -459,12 +494,12 @@ class UniformDistribution(picmistandard.PICMI_UniformDistribution):
 
 	def fill_dict(self,keyvals):
 		back_str,front_str = construct_bounds(self.lower_bound,self.upper_bound)
-		keyvals['profile'] = self.profile
+		keyvals['profile'] = self._profile
 		keyvals['uth'] = [to_scientific_notation(i) for i in self.rms_velocity]
-		keyvals['density'] = to_scientific_notation(self.norm_density)
+		keyvals['density'] = to_scientific_notation(self._norm_density)
 
 
-class PiecewiseDistribution(picmistandard.base._ClassWithInit):
+class PiecewiseDistribution(picmistandard.PICMI_DistributionExtension):
 	"""
 	QPAD-Specific Parameters
 	
@@ -478,26 +513,34 @@ class PiecewiseDistribution(picmistandard.base._ClassWithInit):
 	
 
 	"""
-	def __init__(self, density, lower_bound=[None, None, None], 
-		upper_bound=[None, None, None], rms_velocity=[0.0, 0.0, 0.0], 
-		directed_velocity=[0.0, 0.0, 0.0], fill_in=None, piecewise_s = [0.0], piecewise_fs = [1.0], **kw):
-		
-		self.density = density
-		self.lower_bound = lower_bound
-		self.upper_bound = upper_bound
-		self.rms_velocity = rms_velocity
-		self.directed_velocity = directed_velocity
-		self.fill_in = fill_in
-		self.piecewise_s = piecewise_s
-		self.piecewise_fs = piecewise_fs
-		self.profile = ['uniform', 'piecewise-linear']
-		self.handle_init(kw)
+	density: float = Field(description='Physical number density [m^-3]')
+	lower_bound: list[float | None] = Field(default_factory=lambda: [None, None, None],
+		description='Lower bound of the distribution [m]')
+	upper_bound: list[float | None] = Field(default_factory=lambda: [None, None, None],
+		description='Upper bound of the distribution [m]')
+	rms_velocity: list[float] = Field(default_factory=lambda: [0.0, 0.0, 0.0],
+		description='Thermal velocity spread [m/s]')
+	directed_velocity: list[float] = Field(default_factory=lambda: [0.0, 0.0, 0.0],
+		description='Directed, average, proper velocity [m/s]')
+	fill_in: bool | None = Field(default=None,
+		description='Flags whether to fill in the empty spaced opened up when the grid moves')
+	piecewise_s: list[float] = Field(default_factory=lambda: [0.0],
+		description='Longitudinal coordinates of the piecewise-linear profile [m]')
+	piecewise_fs: list[float] = Field(default_factory=lambda: [1.0],
+		description='Densities at piecewise_s [m^-3]')
+
+	_profile: list = PrivateAttr(default_factory=lambda: ['uniform', 'piecewise-linear'])
+	_norm_density: float | None = PrivateAttr(default=None)
+
+	def __init__(self, density, **kw):
+		# keep density as the (optional) positional argument of the pre-pydantic signature
+		super().__init__(density=density, **kw)
 		
 
 
 	def normalize_units(self,species, density_norm):
 		# normalize plasma density
-		self.norm_density = self.density/density_norm
+		self._norm_density = self.density/density_norm
 
 		# normalized charge, mass, density
 		# self.q = species.charge/constants.q_e
@@ -523,9 +566,9 @@ class PiecewiseDistribution(picmistandard.base._ClassWithInit):
 
 
 	def fill_dict(self,keyvals):
-		keyvals['profile'] = self.profile
+		keyvals['profile'] = self._profile
 		keyvals['uth'] = [to_scientific_notation(i) for i in self.rms_velocity]
-		keyvals['density'] = to_scientific_notation(self.norm_density)
+		keyvals['density'] = to_scientific_notation(self._norm_density)
 		keyvals['piecewise_s'] = [to_scientific_notation(i) for i in self.piecewise_s]
 		keyvals['piecewise_fs'] = [to_scientific_notation(i) for i in self.piecewise_fs]
 
@@ -545,9 +588,12 @@ class AnalyticDistribution(picmistandard.PICMI_AnalyticDistribution):
 		Profiles are multiplicative f(r,z) = f(r)  * f(z)
 
 	"""
-	def init(self,kw):
-		# default profile for uniform plasmas
-		self.profile = ['analytic', 'analytic']
+	# default profile for uniform plasmas
+	_profile: list = PrivateAttr(default_factory=lambda: ['analytic', 'analytic'])
+	_norm_density: float | None = PrivateAttr(default=None)
+
+	def model_post_init(self, context):
+		super().model_post_init(context)
 		if(np.any(self.momentum_expressions == None)):
 			print('Warning: QPAD does not support momentum expressions for Analytic Distributions.')
 
@@ -566,7 +612,7 @@ class AnalyticDistribution(picmistandard.PICMI_AnalyticDistribution):
 
 		self.density_expression = normalize_math_func(self.density_expression, density_norm)
 		self.density_expression =  self.density_expression + '/' + str(density_norm)
-		self.norm_density = 1.0
+		self._norm_density = 1.0
 
 		for i in range(3):
 			self.rms_velocity[i] /= constants.c 
@@ -578,28 +624,28 @@ class AnalyticDistribution(picmistandard.PICMI_AnalyticDistribution):
 	def fill_dict(self,keyvals):
 		# if(self.lower_bound is not None)
 		back_str,front_str = construct_bounds(self.lower_bound,self.upper_bound)
-		keyvals['profile'] = self.profile
+		keyvals['profile'] = self._profile
 		keyvals['uth'] = [to_scientific_notation(i) for i in self.rms_velocity]
 		# keyvals['math_func'] = front_str + self.density_expression + back_str
 		keyvals['math_func'] =  self.density_expression
 
 
 class ParticleListDistribution(picmistandard.PICMI_ParticleListDistribution):
-	def init(self,kw):
+	def model_post_init(self, context):
 		raise Exception('Particle list distributions not yet supported in QPAD')
 
 
 # constant, analytic, or mirror fields not yet supported in QPAD
 class ConstantAppliedField(picmistandard.PICMI_ConstantAppliedField):
-	def init(self,kw):
+	def model_post_init(self, context):
 		raise Exception("Constant applied fields are not yet supported in QPAD")
 
 class AnalyticAppliedField(picmistandard.PICMI_AnalyticAppliedField):
-	def init(self,kw):
+	def model_post_init(self, context):
 		raise Exception("Analytic applied fields are not yet supported in QPAD")
 
 class Mirror(picmistandard.PICMI_Mirror):
-	def init(self,kw):
+	def model_post_init(self, context):
 		raise Exception("Mirrors are not yet supported in QPAD")
 
 
@@ -610,8 +656,11 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
 	QPAD_maximum_iterations: integer
 		Number of iterations for predictor corrector solver.
 	"""
-	def init(self, kw):
-		self.maximum_iterations = kw.pop(codename + '_maximum_iterations', None)
+	maximum_iterations: int | None = Field(default=None, alias=codename + '_maximum_iterations',
+		description='Number of iterations for predictor corrector solver')
+
+	def model_post_init(self, context):
+		super().model_post_init(context)
 		if(self.maximum_iterations == None):
 			print('Defaulting to n_iterations = 10 for predictor corrector')
 			self.maximum_iterations = 10
@@ -624,25 +673,46 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
 		
 		
 class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
-	def init(self, kw):
+	def model_post_init(self, context):
 		raise Exception('This feature is not supported. Please use the Electromagnetic solver.')
 
 ## Throw Errors if trying to use 1D/2D/3D cartesian grids with QPAD
 class Cartesian1DGrid(picmistandard.PICMI_Cartesian1DGrid):
-	def init(self, kw):
+	def model_post_init(self, context):
 		raise Exception(codename + ' does not support this feature. Please specify a Cylindrical Grid.')
 
 class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
-	def init(self, kw):
+	def model_post_init(self, context):
 		raise Exception(codename + ' does not support this feature. Please specify a Cylindrical Grid.')
 
 class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
-	def init(self, kw):
+	def model_post_init(self, context):
 		raise Exception(codename + ' does not support this feature. Please specify a Cylindrical Grid.')
 
 
 class CylindricalGrid(picmistandard.PICMI_CylindricalGrid):
-	def init(self, kw):
+	_dr: float | None = PrivateAttr(default=None)
+	_dz: float | None = PrivateAttr(default=None)
+	_boundary: str | None = PrivateAttr(default=None)
+	_r: list | None = PrivateAttr(default=None)
+	_z: list | None = PrivateAttr(default=None)
+
+	def __init__(self, **kw):
+		super().__init__(**kw)
+		# after the validation, which resolves the vector forms (e.g., number_of_cells from nr, nz)
+		self._code_init()
+
+	@property
+	def dr(self):
+		"""Cell size along r (normalized by normalize_units)"""
+		return self._dr
+
+	@property
+	def dz(self):
+		"""Cell size along z (normalized by normalize_units)"""
+		return self._dz
+
+	def _code_init(self):
 		dims = 2
 
 		# second check to make sure window moving forward at c (window speed doesn't actually matter for QPAD)
@@ -651,11 +721,11 @@ class CylindricalGrid(picmistandard.PICMI_CylindricalGrid):
 		if(self.upper_boundary_conditions[0] != 'open' or self.lower_boundary_conditions[1] != 'open' or self.upper_boundary_conditions[1] !='open'): 
 			print('QPAD Defaulting to open boundaries in r and z-directions.')
 
-		self.dr = np.abs(self.upper_bound[0]- self.lower_bound[0])/self.number_of_cells[0]
-		self.dz = np.abs(self.upper_bound[1]- self.lower_bound[1])/self.number_of_cells[1]
-		self.boundary = 'open'
-		self.r = [self.lower_bound[0], self.upper_bound[0]]
-		self.z = [self.lower_bound[1], self.upper_bound[1]]
+		self._dr = np.abs(self.upper_bound[0]- self.lower_bound[0])/self.number_of_cells[0]
+		self._dz = np.abs(self.upper_bound[1]- self.lower_bound[1])/self.number_of_cells[1]
+		self._boundary = 'open'
+		self._r = [self.lower_bound[0], self.upper_bound[0]]
+		self._z = [self.lower_bound[1], self.upper_bound[1]]
 
 	def power_of_two_check(self,n):
 		return (n & (n-1) == 0) and n != 0
@@ -667,24 +737,24 @@ class CylindricalGrid(picmistandard.PICMI_CylindricalGrid):
 
 		#normalize coordinates 
 		for i in range(2):
-			self.r[i] *= k_pe
-			self.z[i] *= k_pe
-		self.dr *= k_pe
-		self.dz *= k_pe
+			self._r[i] *= k_pe
+			self._z[i] *= k_pe
+		self._dr *= k_pe
+		self._dz *= k_pe
 
 	def fill_dict(self,keyvals):
 		keyvals['grid'] = self.number_of_cells
 		keyvals['max_mode'] = self.n_azimuthal_modes
 		box = {}
 		# box['r'] = self.r
-		box['r'] = [to_scientific_notation(i) for i in self.r]
+		box['r'] = [to_scientific_notation(i) for i in self._r]
 		# QPAD 3D is in xi not z (multiply by -1 + reverse z coordinate)
-		box['z'] = [to_scientific_notation(i) for i in [-self.z[1], -self.z[0]]]
+		box['z'] = [to_scientific_notation(i) for i in [-self._z[1], -self._z[0]]]
 		keyvals['box'] = box
-		keyvals['field_boundary'] = self.boundary
+		keyvals['field_boundary'] = self._boundary
 
 
-class FileLayout(picmistandard.base._ClassWithInit):
+class FileLayout(picmistandard.PICMI_LayoutExtension):
 	"""
 	QPAD-Specific Parameters
 	
@@ -698,13 +768,14 @@ class FileLayout(picmistandard.base._ClassWithInit):
 		Number of particles in azimuthal direction. Defaults to 8 * n_azimuthal_modes.
 	"""
 
-	def __init__(self, grid = None, **kw):
-		# n_macroparticles is required.
-		self.profile_type = 'file'
+	grid: picmistandard.PICMI_AnyGrid | None = Field(default=None,
+		description='Grid object specifying the grid to follow')
+
+	_profile_type: str = PrivateAttr(default='file')
 
 
 	def fill_dict(self, keyvals,profile_type):
-		keyvals['profile_type'] = self.profile_type
+		keyvals['profile_type'] = self._profile_type
 
 
 class PseudoRandomLayout(picmistandard.PICMI_PseudoRandomLayout):
@@ -721,16 +792,18 @@ class PseudoRandomLayout(picmistandard.PICMI_PseudoRandomLayout):
 		Number of particles in azimuthal direction. Defaults to 8 * n_azimuthal_modes.
 	"""
 
-	def init(self,kw):
+	_profile_type: str = PrivateAttr(default='random')
+
+	def model_post_init(self, context):
+		super().model_post_init(context)
 		# n_macroparticles is required.
 		assert self.n_macroparticles is not None, Exception('n_macroparticles must be specified when using PseudoRandomLayout with QPAD')
-		self.profile_type = 'random'
 
 
 	def fill_dict(self, keyvals,profile_type):
 		keyvals['npmax'] = self.n_macroparticles * 2 
 		keyvals['total_num'] = self.n_macroparticles
-		keyvals['profile_type'] = self.profile_type
+		keyvals['profile_type'] = self._profile_type
 		keyvals['random_theta'] = False
 		if(profile_type == 'beam'):
 			if(self.n_macroparticles_per_cell is not None):
@@ -750,12 +823,17 @@ class GriddedLayout(picmistandard.PICMI_GriddedLayout):
 	QPAD_num_theta: integer, optional
 		Number of particles in azimuthal direction. Defaults to 8 * n_azimuthal_modes.
 	"""
-	def init(self,kw):
-		self.npmax = kw.pop(codename + '_npmax', 2*10**6)
+	npmax: int = Field(default=2*10**6, alias=codename + '_npmax',
+		description='Particle buffer size per MPI partition')
+	num_theta: int = Field(default=1, alias=codename + '_num_theta',
+		description='Number of particles in azimuthal direction')
+
+	# setting profile type to standard
+	_profile_type: str = PrivateAttr(default='standard')
+
+	def model_post_init(self, context):
+		super().model_post_init(context)
 		# assert len(self.n_macroparticle_per_cell) !=2, print('Warning: '+ codename + ' only supports 2-dimensions for n_macroparticle_per_cell')
-		# setting profile type to standard
-		self.profile_type = 'standard'
-		self.num_theta = kw.pop(codename + '_num_theta', 1)
 		# if(self.num_theta * self.n_macroparticle_per_cell[1] < 8 * self.grid.n_azimuthal_modes):
 		# 	self.num_theta = int((8 * self.grid.n_azimuthal_modes)/self.n_macroparticle_per_cell[1])
 		# 	print('Warning: total azimthal ppc increased to ' + str(self.num_theta * self.n_macroparticle_per_cell[1]))
@@ -804,7 +882,34 @@ class Simulation(picmistandard.PICMI_Simulation):
 		Toggle to report timings. Turned off by default.
 
 	"""
-	def init(self,kw):
+	cpu_split: list[int] = Field(default_factory=lambda: [1, 1], alias=codename + '_nodes',
+		description='MPI-node configuration')
+	n0: float | None = Field(default=None, alias=codename + '_n0',
+		description='Plasma density [m^-3] to normalize units')
+	random_seed: int = Field(default=10, alias=codename + '_random_seed',
+		description='Number of seeds for pseudo-random numbers')
+	algorithm: str = Field(default='standard', alias=codename + '_algorithm',
+		description='Type of algorithm (standard, pgc, etc.)')
+	if_timing: bool = Field(default=False, alias=codename + '_timings',
+		description='Toggle to report timings')
+	read_restart: bool = Field(default=False, alias=codename + '_read_restart',
+		description='Toggle to read from restart files')
+	restart_timestep: int = Field(default=-1, alias=codename + '_restart_timestep',
+		description='Timestep to restart from if read_restart = True')
+	dump_restart: bool = Field(default=False, alias=codename + '_dump_restart',
+		description='Toggle to dump restart files')
+	ndump_restart: int = Field(default=-1, alias=codename + '_ndump_restart',
+		description='Restart dump period if dump_restart = True')
+
+	### QPAD differentiates between beams, neutrals, and plasmas (species)
+	_if_beam: list = PrivateAttr(default_factory=list)
+	# no of neutrals
+	_if_neutral: list = PrivateAttr(default_factory=list)
+	# no of species
+	_if_species: list = PrivateAttr(default_factory=list)
+
+	def model_post_init(self, context):
+		super().model_post_init(context)
 		# set verbose default
 		if(self.verbose is None):
 			self.verbose = 0
@@ -814,42 +919,15 @@ class Simulation(picmistandard.PICMI_Simulation):
 			print('Warning: Defaulting to linear particle shapes.')
 			self.particle_shape = 'linear'
 
-		self.cpu_split = kw.pop(codename + '_nodes', [1, 1])
-
-		### QPAD differentiates between beams, neutrals, and plasmas (species)
-		self.if_beam = []
-
-		# no of neutrals
-		self.if_neutral = []
-
-		# no of species
-		self.if_species = []
-
-		# check if normalized density is specified
-		self.n0 = kw.pop(codename + '_n0', None)
-
-		# set number of seeds for pseudo-random numbers
-		self.random_seed = kw.pop(codename + '_random_seed', 10)
-
-		# set algorithm type (default is standard)
-		self.algorithm = kw.pop(codename + '_algorithm', 'standard')
-
-		# set timings (default is true)
-		self.if_timing = kw.pop(codename + '_timings', False)
-
 		# normalize simulation time
 		if(self.n0 is not None):
 			self.normalize_simulation()
 
 		# check to read from restart files
-		self.read_restart = kw.pop(codename + '_read_restart', False)
-		self.restart_timestep = kw.pop(codename + '_restart_timestep', -1)
 		if(self.read_restart):
 			assert self.restart_timestep != -1, Exception('Please specify ' + codename + '_restart_timestep')
 
 		# check if dumping restart files
-		self.dump_restart = kw.pop(codename + '_dump_restart', False)
-		self.ndump_restart = kw.pop(codename + '_ndump_restart', -1)
 		if(self.dump_restart):
 			assert self.ndump_restart != -1, Exception('Please specify' + codename + '_ndump_restart')
 
@@ -868,9 +946,9 @@ class Simulation(picmistandard.PICMI_Simulation):
 										  initialize_self_field )
 
 				# handle checks for beams
-				self.if_beam.append(spec.profile_type == 'beam')
-				self.if_neutral.append(spec.profile_type == 'neutral')
-				self.if_species.append(spec.profile_type == 'species')
+				self._if_beam.append(spec._profile_type == 'beam')
+				self._if_neutral.append(spec._profile_type == 'neutral')
+				self._if_species.append(spec._profile_type == 'species')
 				spec.normalize_units()
 			if(self.n0 is not None):
 					species.initial_distribution.normalize_units(spec, self.n0)
@@ -882,9 +960,9 @@ class Simulation(picmistandard.PICMI_Simulation):
 				species.initial_distribution.normalize_units(species, self.n0)
 				species.normalize_units()
 			# handle checks for beams
-			self.if_beam.append(species.profile_type == 'beam')
-			self.if_neutral.append(species.profile_type == 'neutral')
-			self.if_species.append(species.profile_type == 'species')
+			self._if_beam.append(species._profile_type == 'beam')
+			self._if_neutral.append(species._profile_type == 'neutral')
+			self._if_species.append(species._profile_type == 'species')
 	def add_laser(self, laser, injection_method):
 		picmistandard.PICMI_Simulation.add_laser(self, laser, injection_method)
 		if(injection_method is not None):
@@ -913,9 +991,9 @@ class Simulation(picmistandard.PICMI_Simulation):
 
 		if(self.n0 is not None):
 			keyvals['n0'] = to_scientific_notation(self.n0 * 1.e-6) # in density in cm^{-3}
-		keyvals['nbeams'] = int(np.sum(self.if_beam))
-		keyvals['nspecies'] = int(np.sum(self.if_species))
-		keyvals['nneutrals'] = int(np.sum(self.if_neutral))
+		keyvals['nbeams'] = int(np.sum(self._if_beam))
+		keyvals['nspecies'] = int(np.sum(self._if_species))
+		keyvals['nneutrals'] = int(np.sum(self._if_neutral))
 		keyvals['nlasers'] = len(self.lasers)
 		self.solver.fill_dict(keyvals)
 		keyvals['dump_restart'] = self.dump_restart
@@ -954,7 +1032,7 @@ class Simulation(picmistandard.PICMI_Simulation):
 		for i in range(len(self.species)):
 			spec = self.species[i]
 			temp_dict = {}
-			self.layouts[i].fill_dict(temp_dict,spec.profile_type)
+			self.layouts[i].fill_dict(temp_dict,spec._profile_type)
 			self.species[i].fill_dict(temp_dict, len(self.lasers) > 0)
 
 			# fill in source term diagnostics
@@ -967,9 +1045,9 @@ class Simulation(picmistandard.PICMI_Simulation):
 				self.diagnostics[j].fill_dict_src(temp_dict2)
 				diags_srcs.append(temp_dict2)
 			temp_dict['diag'] = diags_srcs
-			if(self.if_beam[i]):
+			if(self._if_beam[i]):
 				beam_dicts.append(temp_dict)
-			elif(self.if_neutral[i]):
+			elif(self._if_neutral[i]):
 				neutral_dicts.append(temp_dict)
 			else:
 				species_dicts.append(temp_dict)
@@ -1013,67 +1091,71 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic):
 	QPAD-Specific Parameters
 
 	"""
-	def init(self,kw):
+	_field_list: list = PrivateAttr(default_factory=list)
+	_source_list: list = PrivateAttr(default_factory=list)
+
+	def model_post_init(self, context):
+		super().model_post_init(context)
 		assert self.write_dir != '.', Exception("Write directory feature not yet supported.")
 		assert self.period > 0, Exception("Diagnostic period is not valid")
-		self.field_list = []
-		self.source_list = []
+		self._field_list = []
+		self._source_list = []
 		if('E' in self.data_list):
-			self.field_list += ['er_cyl_m','ephi_cyl_m','ez_cyl_m']
+			self._field_list += ['er_cyl_m','ephi_cyl_m','ez_cyl_m']
 		if('B' in self.data_list):
-			self.field_list += ['br_cyl_m','bphi_cyl_m','bz_cyl_m']
+			self._field_list += ['br_cyl_m','bphi_cyl_m','bz_cyl_m']
 		if('rho' in self.data_list):
-			self.source_list += ['charge_cyl_m']
+			self._source_list += ['charge_cyl_m']
 		if('J' in self.data_list):
-			self.source_list += ['jr_cyl_m','jphi_cyl_m','jz_cyl_m']
+			self._source_list += ['jr_cyl_m','jphi_cyl_m','jz_cyl_m']
 
 
 		if('Ex' in self.data_list or 'Er' in self.data_list):
-			self.field_list.append('er_cyl_m')
+			self._field_list.append('er_cyl_m')
 		if('Ey' in self.data_list or 'Ephi' in self.data_list):
-			self.field_list.append('ephi_cyl_m')
+			self._field_list.append('ephi_cyl_m')
 		if('Ez' in self.data_list or 'Ez' in self.data_list):
-			self.field_list.append('ez_cyl_m')
+			self._field_list.append('ez_cyl_m')
 
 		if('Bx' in self.data_list or 'Br' in self.data_list):
-			self.field_list.append('br_cyl_m')
+			self._field_list.append('br_cyl_m')
 		if('By' in self.data_list or 'Bphi' in self.data_list):
-			self.field_list.append('bphi_cyl_m')
+			self._field_list.append('bphi_cyl_m')
 		if('Bz' in self.data_list or 'Bz' in self.data_list):
-			self.field_list.append('bz_cyl_m')
+			self._field_list.append('bz_cyl_m')
 
 		if('Jx' in self.data_list or 'Jr' in self.data_list):
-			self.source_list.append('jr_cyl_m')
+			self._source_list.append('jr_cyl_m')
 		if('Jy' in self.data_list or 'Jphi' in self.data_list):
-			self.source_list.append('jphi_cyl_m')
+			self._source_list.append('jphi_cyl_m')
 		if('Jz' in self.data_list or 'Jz' in self.data_list):
-			self.source_list.append('jz_cyl_m')
+			self._source_list.append('jz_cyl_m')
 
 		# need to add to PICMI standard
 		if('psi' in self.data_list):
-			self.field_list += ['psi_cyl_m']
+			self._field_list += ['psi_cyl_m']
 
 
 	def fill_dict_fld(self,keyvals):
-		keyvals['name'] = self.field_list
+		keyvals['name'] = self._field_list
 		keyvals['ndump'] = self.period
 
 	def fill_dict_src(self,keyvals):
-		keyvals['name'] = self.source_list
+		keyvals['name'] = self._source_list
 		keyvals['ndump'] = self.period
 
 
 # QPAD does not support electrostatic and boosted frame diagnostic 
 class ElectrostaticFieldDiagnostic(picmistandard.PICMI_ElectrostaticFieldDiagnostic):
-	def init(self,kw):
+	def model_post_init(self, context):
 		raise Exception("Electrostatic field diagnostic not supported in QPAD")
 
 class LabFrameParticleDiagnostic(picmistandard.PICMI_LabFrameParticleDiagnostic):
-	def init(self,kw):
+	def model_post_init(self, context):
 		raise Exception("Boosted frame diagnostics not support in QPAD")
 
 class LabFrameFieldDiagnostic(picmistandard.PICMI_LabFrameFieldDiagnostic):
-	def init(self,kw):
+	def model_post_init(self, context):
 		raise Exception("Boosted frame diagnostics not support in QPAD")
 
 
@@ -1085,12 +1167,14 @@ class ParticleDiagnostic(picmistandard.PICMI_ParticleDiagnostic):
 	QPAD_sample: integer, optional
 		Dumps every nth particle.
 	"""
-	def init(self,kw):
-		# print(kw)
+	sample: int = Field(default=1, alias=codename + '_sample',
+		description='Dumps every nth particle')
+
+	def model_post_init(self, context):
+		super().model_post_init(context)
 		assert self.write_dir != '.', Exception("Write directory feature not yet supported.")
 		assert self.period > 0, Exception("Diagnostic period is not valid")
 		print('Warning: Particle diagnostic reporting momentum, position and charge data')
-		self.sample = kw.pop(codename + '_sample', 1) 
 
 	def fill_dict_fld(self,keyvals):
 		pass
@@ -1102,9 +1186,14 @@ class ParticleDiagnostic(picmistandard.PICMI_ParticleDiagnostic):
 
 
 class GaussianLaser(picmistandard.PICMI_GaussianLaser):
-	def init(self, kw):
-		self.profile = ['gaussian', 'polynomial']
-		self.iteration = 3
+	_profile: list = PrivateAttr(default_factory=lambda: ['gaussian', 'polynomial'])
+	_iteration: int = PrivateAttr(default=3)
+	# laser wavenumber, normalized by normalize_units (the standard's k0 is derived from the wavelength)
+	_k0: float | None = PrivateAttr(default=None)
+
+	def model_post_init(self, context):
+		super().model_post_init(context)
+		self._k0 = self.k0
 
 	def normalize_units(self, density_norm):
 		# normalize quantities to plasma density and skin depths
@@ -1112,7 +1201,7 @@ class GaussianLaser(picmistandard.PICMI_GaussianLaser):
 		k_pe = w_pe/constants.c
 
 
-		self.k0 = self.k0/k_pe
+		self._k0 = self._k0/k_pe
 		self.waist = k_pe * self.waist
 		self.duration = w_pe * self.duration 
 		for i in range(3):
@@ -1121,11 +1210,11 @@ class GaussianLaser(picmistandard.PICMI_GaussianLaser):
 
 
 	def fill_dict(self,keyvals):
-		keyvals['profile'] = self.profile
+		keyvals['profile'] = self._profile
 		keyvals['a0'] = self.a0
-		keyvals['k0'] = self.k0
+		keyvals['k0'] = self._k0
 		keyvals['w0'] = self.waist
-		keyvals['iteration'] = self.iteration
+		keyvals['iteration'] = self._iteration
 		keyvals['focal_distance'] = self.focal_position[2]
 		keyvals['t_rise'] = self.duration * 1.5275
 		keyvals['t_fall'] = self.duration * 1.5275
@@ -1147,11 +1236,17 @@ class GaussianLaser(picmistandard.PICMI_GaussianLaser):
 
 		
 class LaserAntenna(picmistandard.PICMI_LaserAntenna):
-	def init(self, kw):
-		return
+	pass
 
 class BinomialSmoother(picmistandard.PICMI_BinomialSmoother):
-	def init(self, kw):
+	# also accept a single value for all axes, as before the pydantic standard
+	n_pass: int | list[int] | None = Field(default=None,
+		description='Number of passes along each axis (a single integer applies to all axes)')
+	compensation: bool | list[bool] | None = Field(default=None,
+		description='Flags whether to apply compensation along each axis (a single flag applies to all axes)')
+
+	def model_post_init(self, context):
+		super().model_post_init(context)
 		print("Warning: QPAD has no BinomialSmoother. Skipping feature.")
 
 def normalize_math_func(math_func, density_norm):

@@ -1,7 +1,9 @@
-# picmistandard 0.35+ is a breaking change (pydantic refactor):
+# PICMI 0.35+ with pydantic classes, not yet released:
 # https://github.com/picmi-standard/picmi/pull/133
-# keep in sync with the version checks in picmi_scripts/picmi_*.py
-picmistandard<=0.34.0
+# For now, this is pinned to the PR's head commit; switch to picmistandard>=0.35.0 once released.
+# Keep in sync with the version checks in picmi_scripts/picmi_*.py
+picmistandard @ git+https://github.com/chillenzer/picmi.git@475bf0d90048437005ae798b4edc84d5357b2526
+pydantic>=2.13
 numpy
 scipy
 h5py
